@@ -1,0 +1,1110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Invoice Tracker — Leon Electricians Ltd</title>
+<style>
+:root{
+  --navy:#0b1b33;
+  --navy2:#132a4c;
+  --yellow:#f3c623;
+  --bg:#eef1f6;
+  --line:#dde3ec;
+  --ink:#101827;
+  --mute:#6b7280;
+  --green:#15803d;
+  --amber:#b45309;
+  --red:#b91c1c;
+  --blue:#1d4ed8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit;font-size:inherit}
+
+/* header */
+.hdr{background:var(--navy);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:60}
+.hdr-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:1080px;margin:auto}
+.hdr h1{font-size:17px;color:var(--yellow);font-weight:800;letter-spacing:.2px}
+.hdr .sub{font-size:11px;color:#a8bcd8;margin-top:1px}
+.spacer{flex:1}
+.live{display:flex;align-items:center;gap:6px;font-size:11px;color:#a8bcd8;background:#ffffff14;border-radius:999px;padding:5px 10px}
+.dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 #22c55e88;animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #22c55e77}70%{box-shadow:0 0 0 7px #22c55e00}100%{box-shadow:0 0 0 0 #22c55e00}}
+.nav{display:flex;gap:6px;margin-top:10px;max-width:1080px;margin-left:auto;margin-right:auto}
+.nbtn{background:transparent;border:1.5px solid #ffffff33;color:#fff;border-radius:999px;padding:7px 15px;font-size:13px;font-weight:700;cursor:pointer}
+.nbtn.on{background:var(--yellow);color:var(--navy);border-color:var(--yellow)}
+.mini{background:#ffffff14;border:1.5px solid #ffffff26;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.mini:active{opacity:.7}
+
+/* layout */
+.wrap{max-width:1080px;margin:auto;padding:14px 12px 80px}
+.crumb{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--mute);margin-bottom:12px}
+.crumb a{color:var(--navy);font-weight:700;cursor:pointer;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+h2.page{font-size:20px;font-weight:800;color:var(--navy);margin-bottom:2px}
+p.page{font-size:13px;color:var(--mute);margin-bottom:14px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+.stat .k{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)}
+.stat .v{font-size:20px;font-weight:800;margin-top:5px;color:var(--navy)}
+.stat.paid .v{color:var(--green)}
+.stat.out .v{color:var(--red)}
+
+.sec{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 10px}
+.sec h3{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--navy)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 18px #0b1b3314}
+.card .cname{font-size:16px;font-weight:800;color:var(--navy);padding-right:62px}
+.card .crow{display:flex;justify-content:space-between;font-size:13px;margin-top:8px;color:var(--mute)}
+.card .crow b{color:var(--ink);font-weight:700}
+.bar{height:6px;border-radius:999px;background:#eef1f6;margin-top:10px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--green)}
+.xbtn{position:absolute;top:9px;right:9px;background:#f3f4f6;border:0;border-radius:7px;width:26px;height:26px;font-size:13px;color:var(--mute);cursor:pointer;line-height:1}
+.xbtn:hover{background:#fee2e2;color:var(--red)}
+.xbtn.ren{right:41px}
+.xbtn.ren:hover{background:#dbeafe;color:var(--blue)}
+
+.months{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:9px}
+.mcard{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px;cursor:pointer}
+.mcard.empty{opacity:.55}
+.mcard:hover{border-color:var(--navy)}
+.mcard .mn{font-size:14px;font-weight:800;color:var(--navy)}
+.mcard .mv{font-size:17px;font-weight:800;margin-top:4px}
+.mcard .ms{font-size:11px;color:var(--mute);margin-top:3px}
+
+.list{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.row:last-child{border-bottom:0}
+.row:hover{background:#f8fafc}
+.row .rmain{flex:1;min-width:0}
+.row .rt{font-weight:700;font-size:14px;color:var(--navy)}
+.row .rs{font-size:12px;color:var(--mute);margin-top:3px}
+.row .ramt{font-weight:800;font-size:15px;white-space:nowrap}
+.chev{color:#c3cbd8;font-weight:800}
+
+.pill{display:inline-block;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:800;white-space:nowrap}
+.p-paid{background:#dcfce7;color:var(--green)}
+.p-part{background:#fef3c7;color:var(--amber)}
+.p-pend{background:#dbeafe;color:var(--blue)}
+.p-unpaid{background:#fee2e2;color:var(--red)}
+.p-none{background:#f1f5f9;color:var(--mute)}
+
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+th{background:var(--navy);color:var(--yellow);text-align:left;padding:9px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+td{border-bottom:1px solid var(--line);padding:10px;vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tfoot td{background:#f8fafc;font-weight:800;border-top:2px solid var(--navy)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.num{text-align:right;white-space:nowrap}
+.tiny{background:#f3f4f6;border:0;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;color:var(--mute);cursor:pointer;margin-left:4px}
+.tiny:hover{background:#e5e7eb;color:var(--ink)}
+.tiny.del:hover{background:#fee2e2;color:var(--red)}
+
+.btn{border:0;border-radius:9px;padding:10px 16px;font-weight:800;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn:active{opacity:.75}
+.b-primary{background:var(--navy);color:#fff}
+.b-yellow{background:var(--yellow);color:var(--navy)}
+.b-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line)}
+.b-danger{background:#fff;color:var(--red);border:1.5px solid #fecaca}
+
+.empty-state{background:#fff;border:1px dashed var(--line);border-radius:12px;padding:34px 18px;text-align:center;color:var(--mute)}
+.empty-state b{display:block;color:var(--navy);font-size:15px;margin-bottom:4px}
+
+/* modal */
+.mbg{display:none;position:fixed;inset:0;background:#0b1b33cc;z-index:200;align-items:flex-end;justify-content:center;padding:0}
+.mbg.on{display:flex}
+.modal{background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:620px;max-height:92vh;overflow-y:auto;padding:18px 16px 26px}
+.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.mhead h4{font-size:16px;font-weight:800;color:var(--navy)}
+.f{margin-bottom:11px}
+.f label{display:block;font-size:12px;font-weight:800;color:#374151;margin-bottom:5px}
+.f input,.f select,.f textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--navy)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hintline{font-size:12px;color:var(--mute);margin-top:-4px;margin-bottom:10px}
+
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--navy);color:#fff;padding:11px 20px;border-radius:999px;font-size:13px;font-weight:700;z-index:900;transition:transform .25s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+
+body.ro .editable{display:none!important}
+.rep{background:#fee2e2;color:var(--red);border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;white-space:nowrap}
+.dupbox{background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px;margin-bottom:10px}
+.dupbox .dt{font-size:13px;font-weight:800;color:var(--amber);margin-bottom:4px}
+.dupbox .dl{font-size:12px;color:#7c2d12;margin-bottom:8px;line-height:1.5}
+.dupbox .btn{padding:7px 13px;font-size:12px;margin-right:6px}
+.dupbox.done{background:#f0fdf4;border-color:#bbf7d0}
+.dupbox.done .dt{color:var(--green)}
+.gl{display:flex;align-items:flex-start;gap:9px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:13px}
+.gl:last-child{border-bottom:0}
+.gl input{width:18px;height:18px;margin-top:2px;flex-shrink:0}
+.gl .ga{flex:1;min-width:0}
+.gl .gv{font-weight:800;white-space:nowrap}
+.gl.off{opacity:.45}
+.gtot{display:flex;justify-content:space-between;padding:12px 4px;font-size:16px;font-weight:800;color:var(--navy);border-top:2px solid var(--navy);margin-top:4px}
+
+/* printable invoice */
+#printarea{display:none}
+.doc{font-size:13px;color:#111}
+.doc .lh{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid var(--navy);padding-bottom:12px;margin-bottom:16px}
+.doc .co{font-size:19px;font-weight:800;color:var(--navy)}
+.doc .cd{font-size:11px;color:#555;line-height:1.6;margin-top:4px}
+.doc .it{text-align:right}
+.doc .it .ti{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:1px}
+.doc .it .tn{font-size:12px;line-height:1.7;margin-top:4px}
+.doc .to{margin-bottom:14px;font-size:12px;line-height:1.6}
+.doc table{width:100%;border-collapse:collapse;font-size:12px}
+.doc th{background:var(--navy);color:#fff;padding:8px;text-align:left;font-size:11px}
+.doc td{border-bottom:1px solid #ddd;padding:7px 8px}
+.doc .tr{text-align:right}
+.doc .tot td{border-top:2px solid var(--navy);border-bottom:0;font-weight:800;font-size:15px;padding-top:10px}
+.doc .ft{margin-top:22px;padding-top:12px;border-top:1px solid #ddd;font-size:10px;color:#666;line-height:1.7}
+@media print{
+  body>*:not(#printarea){display:none!important}
+  #printarea{display:block!important}
+  @page{margin:14mm}
+}
+
+
+@media(max-width:640px){
+  .stats{grid-template-columns:1fr 1fr}
+  .f2{grid-template-columns:1fr}
+  .hdr h1{font-size:15px}
+}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<div id="toast"></div>
+<div id="printarea"></div>
+
+<div id="shell">
+<div class="hdr">
+  <div class="hdr-top">
+    <div>
+      <h1>⚡ INVOICE TRACKER</h1>
+      <div class="sub">Leon Electricians Ltd — weekly income &amp; invoice status</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="live"><span class="dot"></span><span id="synced">Connecting…</span></div>
+    <button class="mini" id="robtn" onclick="toggleRO()">View only: off</button>
+  </div>
+  <div class="nav">
+    <button class="nbtn on" id="nav-dash" onclick="go({view:'home'})">Contractors</button>
+    <button class="nbtn" id="nav-inv" onclick="go({view:'invoices'})">All invoices</button>
+  </div>
+</div>
+
+<div class="wrap" id="app">
+  <div class="empty-state"><b>Loading your records…</b>One moment.</div>
+</div>
+
+<div class="mbg" id="mbg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="mhead"><h4 id="mtitle">Edit</h4><button class="btn b-ghost" style="padding:7px 12px" onclick="closeModal()">Close</button></div>
+    <div id="mbody"></div>
+  </div>
+</div>
+</div>
+
+<script>
+/* ─────────────────────── Firebase connection ─────────────────────── */
+var firebaseConfig = {
+  apiKey: "AIzaSyDQu3EBjsp4pEBqLWu0gMjxFtqQRgkB3hw",
+  authDomain: "leon-invoice-tracker.firebaseapp.com",
+  databaseURL: "https://leon-invoice-tracker-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "leon-invoice-tracker",
+  storageBucket: "leon-invoice-tracker.firebasestorage.app",
+  messagingSenderId: "581901171052",
+  appId: "1:581901171052:web:03e871c58de1c76d3fdb49"
+};
+var FB_OK = (typeof firebase !== 'undefined' && firebase.initializeApp);
+var auth = null, rtdb = null;
+if(FB_OK){
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  rtdb = firebase.database();
+}
+
+var DB  = {contractors:[], entries:[], invoices:[], minvoices:[]};
+var route = {view:'home'};
+var modalOpen = false, pendingRender = false, seedTried = false;
+
+var DEFAULT_CONTRACTORS = ['Peabody','Morgan & Sindall','PGM / B&X Construction','XPRT / MTS'];
+var STATUSES = ['Pending','Unpaid','Partially Paid','Paid'];
+
+function uid(p){ return p + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* every record lives at its own path, so two people editing at once
+   change different records instead of overwriting each other's work */
+function ref(path){ return rtdb.ref(path); }
+
+function save(path, value, msg){
+  return ref(path).set(value)
+    .then(function(){ if(msg) toast(msg); })
+    .catch(function(){ toast('Could not save — check your connection'); });
+}
+function wipe(path){
+  return ref(path).remove().catch(function(){ toast('Could not delete — check your connection'); });
+}
+function applyUpdate(map, msg){
+  return rtdb.ref().update(map)
+    .then(function(){ if(msg) toast(msg); })
+    .catch(function(){ toast('Could not save — check your connection'); });
+}
+
+function mapToList(obj){
+  if(!obj) return [];
+  return Object.keys(obj).map(function(k){
+    var v = obj[k] || {};
+    v.id = k;
+    return v;
+  });
+}
+
+function watchData(){
+  ref('/').on('value', function(snap){
+    var v = snap.val() || {};
+    DB.contractors = mapToList(v.contractors);
+    DB.entries     = mapToList(v.entries);
+    DB.invoices    = mapToList(v.invoices);
+    DB.minvoices   = mapToList(v.minvoices);
+    stamp();
+    if(modalOpen){ pendingRender = true; } else { render(); }
+    seedIfEmpty(v);
+  }, function(){
+    document.getElementById('synced').textContent = 'No access — check your rules';
+  });
+}
+
+/* first person in gets the four contractors; the transaction stops
+   two devices seeding duplicates at the same time */
+function seedIfEmpty(v){
+  if(seedTried || (v && v.contractors) || (v && v.meta && v.meta.seeded)) return;
+  seedTried = true;
+  ref('meta/seeded').transaction(function(cur){ return cur ? undefined : true; }, function(err, committed){
+    if(err || !committed) return;
+    var map = {};
+    DEFAULT_CONTRACTORS.forEach(function(nm){ map['contractors/'+uid('c')] = {name:nm}; });
+    applyUpdate(map);
+  });
+}
+
+function stamp(){
+  var t = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('synced').textContent = 'Live · ' + t;
+}
+
+/* ─────────────────────────── helpers ─────────────────────────── */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function n(v){var x=parseFloat(v);return isNaN(x)?0:x;}
+function fmt(v){return '£'+n(v).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtShort(v){return '£'+Math.round(n(v)).toLocaleString('en-GB');}
+
+function isoOf(d){var p=function(x){return String(x).padStart(2,'0');};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+function today(){return isoOf(new Date());}
+function mondayOf(iso){
+  var d=new Date(iso+'T12:00:00');
+  var off=(d.getDay()+6)%7;      // Mon=0 … Sun=6
+  d.setDate(d.getDate()-off);
+  return isoOf(d);
+}
+function addDays(iso,k){var d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+k);return isoOf(d);}
+function uk(iso){if(!iso)return '';var d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-GB');}
+function ukShort(iso){var d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});}
+function monthEnd(mk){var q=mk.split('-');return isoOf(new Date(+q[0],+q[1],0,12));}
+/* A week never crosses a month boundary. It runs Monday to Sunday, but the
+   first week of a month starts on the 1st and the last one stops on the last
+   day — so the weeks of a month always add up to exactly that month. */
+function weekStartFor(iso){
+  var m = mondayOf(iso), first = iso.slice(0,8)+'01';
+  return m < first ? first : m;
+}
+function weekEndFor(ws){
+  var sunday = addDays(mondayOf(ws),6), last = monthEnd(ws.slice(0,7));
+  return sunday < last ? sunday : last;
+}
+function weekLabel(w){return ukShort(w)+' – '+uk(weekEndFor(w));}
+function monthOfWeek(w){return w.slice(0,7);}
+function monthName(mk){var p=mk.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'long'});}
+function monthFull(mk){var p=mk.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});}
+
+/* the 1st of the month, then every Monday after it */
+function weeksInMonth(mk){
+  var q=mk.split('-'), y=+q[0], m=+q[1];
+  var out=[mk+'-01'];
+  var d=new Date(y,m-1,1,12);
+  while(d.getMonth()===m-1){
+    if(d.getDay()===1 && d.getDate()!==1) out.push(isoOf(d));
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+
+function contractor(id){ for(var i=0;i<DB.contractors.length;i++) if(DB.contractors[i].id===id) return DB.contractors[i]; return null; }
+function entriesFor(cid,week,mk){
+  return DB.entries.filter(function(e){
+    if(cid && e.contractorId!==cid) return false;
+    var w = weekStartFor(e.date);
+    if(week && w!==week) return false;
+    if(mk && monthOfWeek(w)!==mk) return false;
+    return true;
+  });
+}
+function invoicesFor(cid,week,mk){
+  return DB.invoices.filter(function(v){
+    if(cid && v.contractorId!==cid) return false;
+    if(week && v.week!==week) return false;
+    if(mk && monthOfWeek(v.week)!==mk) return false;
+    return true;
+  });
+}
+function monthInvoicesFor(cid,mk){
+  return DB.minvoices.filter(function(v){
+    if(cid && v.contractorId!==cid) return false;
+    if(mk && v.month!==mk) return false;
+    return true;
+  });
+}
+/* weekly and monthly invoices side by side, each tagged with its type */
+function invRows(cid,mk){
+  var out=[];
+  invoicesFor(cid,null,mk).forEach(function(v){ out.push({r:v,type:'Weekly',period:weekLabel(v.week),mk:monthOfWeek(v.week)}); });
+  monthInvoicesFor(cid,mk).forEach(function(v){ out.push({r:v,type:'Monthly',period:monthFull(v.month),mk:v.month}); });
+  return out;
+}
+function rowsTotal(rows){return sum(rows,function(x){return x.r.amount;});}
+function rowsPaid(rows){return sum(rows,function(x){return invPaid(x.r);});}
+
+/* a repeat = same address AND same price inside the same month */
+function dupKey(e){ return String(e.address||'').toLowerCase().replace(/[^a-z0-9]/g,'') + '|' + n(e.amount).toFixed(2); }
+function dupGroups(list){
+  var m={}, out=[];
+  list.forEach(function(e){ var k=dupKey(e); (m[k]=m[k]||[]).push(e); });
+  Object.keys(m).forEach(function(k){ if(m[k].length>1) out.push({key:k, items:m[k]}); });
+  return out;
+}
+function dupIds(list){
+  var ids={};
+  dupGroups(list).forEach(function(g){ g.items.forEach(function(e){ ids[e.id]=true; }); });
+  return ids;
+}
+
+function sum(arr,f){var t=0;for(var i=0;i<arr.length;i++)t+=n(f(arr[i]));return t;}
+function worksValue(list){return sum(list,function(e){return e.amount;});}
+function invPaid(v){ return v.status==='Paid' ? n(v.amount) : (v.status==='Partially Paid' ? n(v.paid) : 0); }
+function invOutstanding(v){ return Math.max(0, n(v.amount) - invPaid(v)); }
+function statusClass(s){return s==='Paid'?'p-paid':s==='Partially Paid'?'p-part':s==='Unpaid'?'p-unpaid':'p-pend';}
+
+function yearsAvailable(){
+  var set = {}; set[String(new Date().getFullYear())] = 1;
+  DB.entries.forEach(function(e){ set[e.date.slice(0,4)]=1; });
+  DB.invoices.forEach(function(v){ set[v.week.slice(0,4)]=1; });
+  return Object.keys(set).sort();
+}
+
+/* ─────────────────────────── routing ─────────────────────────── */
+function go(r){ route = r; window.scrollTo(0,0); render(); }
+
+function render(){
+  document.getElementById('nav-dash').className = 'nbtn' + (route.view!=='invoices'?' on':'');
+  document.getElementById('nav-inv').className  = 'nbtn' + (route.view==='invoices'?' on':'');
+  var el = document.getElementById('app');
+  if(route.view==='home')            el.innerHTML = viewHome();
+  else if(route.view==='contractor') el.innerHTML = viewContractor();
+  else if(route.view==='month')      el.innerHTML = viewMonth();
+  else if(route.view==='week')       el.innerHTML = viewWeek();
+  else if(route.view==='invoices')   el.innerHTML = viewInvoices();
+}
+
+function crumbs(parts){
+  var h='<div class="crumb">';
+  for(var i=0;i<parts.length;i++){
+    if(i) h+='<span>›</span>';
+    h += parts[i].go ? '<a onclick=\'go('+JSON.stringify(parts[i].go)+')\'>'+esc(parts[i].t)+'</a>'
+                     : '<span>'+esc(parts[i].t)+'</span>';
+  }
+  return h+'</div>';
+}
+
+/* ─────────────────────────── views ─────────────────────────── */
+function viewHome(){
+  var thisMonth = today().slice(0,7);
+  var allWorks = worksValue(DB.entries);
+  var allRows  = invRows(null,null);
+  var invoiced = rowsTotal(allRows);
+  var paid     = rowsPaid(allRows);
+  var out      = invoiced - paid;
+
+  var h = '<h2 class="page">Contractors</h2><p class="page">Open a contractor to see the month, then the week, then every property.</p>';
+  h += '<div class="stats">'+
+        stat('Works logged', fmtShort(allWorks), '') +
+        stat('Invoiced', fmtShort(invoiced), '') +
+        stat('Paid', fmtShort(paid), 'paid') +
+        stat('Outstanding', fmtShort(out), 'out') +
+       '</div>';
+
+  h += '<div class="sec"><h3>Your contractors</h3><button class="btn b-primary editable" onclick="addContractor()">+ Add contractor</button></div>';
+
+  if(!DB.contractors.length){
+    h += '<div class="empty-state"><b>No contractors yet</b>Add your first one to start logging weekly work.</div>';
+    return h;
+  }
+
+  h += '<div class="grid">';
+  DB.contractors.forEach(function(c){
+    var mine = DB.entries.filter(function(e){return e.contractorId===c.id;});
+    var month = mine.filter(function(e){return e.date.slice(0,7)===thisMonth;});
+    var vs = invRows(c.id,null);
+    var inv = rowsTotal(vs);
+    var pd  = rowsPaid(vs);
+    var pct = inv>0 ? Math.round(pd/inv*100) : 0;
+    h += '<div class="card" onclick="go({view:\'contractor\',cid:\''+c.id+'\'})">'+
+      '<button class="xbtn ren editable" onclick="event.stopPropagation();renameContractor(\''+c.id+'\')" title="Rename contractor">✎</button>'+
+      '<button class="xbtn editable" onclick="event.stopPropagation();delContractor(\''+c.id+'\')" title="Remove contractor">✕</button>'+
+      '<div class="cname">'+esc(c.name)+'</div>'+
+      '<div class="crow"><span>'+monthFull(thisMonth)+'</span><b>'+fmt(worksValue(month))+'</b></div>'+
+      '<div class="crow"><span>Invoiced (all time)</span><b>'+fmt(inv)+'</b></div>'+
+      '<div class="crow"><span>Outstanding</span><b style="color:'+(inv-pd>0?'var(--red)':'var(--green)')+'">'+fmt(inv-pd)+'</b></div>'+
+      '<div class="bar"><span style="width:'+pct+'%"></span></div>'+
+      '<div class="crow" style="margin-top:6px"><span>'+pct+'% of invoices settled</span><span class="chev">›</span></div>'+
+    '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+function stat(k,v,cls){return '<div class="stat '+cls+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';}
+
+function viewContractor(){
+  var c = contractor(route.cid);
+  if(!c) return '<div class="empty-state"><b>That contractor was removed</b><a onclick="go({view:\'home\'})">Back to contractors</a></div>';
+  var years = yearsAvailable();
+  var yr = route.year || String(new Date().getFullYear());
+
+  var h = crumbs([{t:'Contractors',go:{view:'home'}},{t:c.name}]);
+  h += '<h2 class="page">'+esc(c.name)+'</h2><p class="page">Each month shows the value of works logged and what is still owed.</p>';
+
+  var yearMonths = [];
+  for(var m=1;m<=12;m++) yearMonths.push(yr+'-'+String(m).padStart(2,'0'));
+  var yWorks = worksValue(DB.entries.filter(function(e){return e.contractorId===c.id && e.date.slice(0,4)===yr;}));
+  var yInv = invRows(c.id,null).filter(function(x){return x.mk.slice(0,4)===yr;});
+  var yInvT = rowsTotal(yInv);
+  var yPaid = rowsPaid(yInv);
+
+  h += '<div class="stats">'+
+        stat(yr+' works', fmtShort(yWorks),'')+
+        stat(yr+' invoiced', fmtShort(yInvT),'')+
+        stat(yr+' paid', fmtShort(yPaid),'paid')+
+        stat(yr+' outstanding', fmtShort(yInvT-yPaid),'out')+
+       '</div>';
+
+  h += '<div class="sec"><h3>Months</h3><select style="padding:8px 10px;border-radius:9px;border:1.5px solid var(--line);font-weight:700" onchange="go({view:\'contractor\',cid:\''+c.id+'\',year:this.value})">';
+  years.forEach(function(y){ h += '<option'+(y===yr?' selected':'')+'>'+y+'</option>'; });
+  if(years.indexOf(yr)===-1) h += '<option selected>'+yr+'</option>';
+  h += '</select></div>';
+
+  h += '<div class="months">';
+  yearMonths.forEach(function(mk){
+    var es = entriesFor(c.id,null,mk);
+    var vs = invRows(c.id,mk);
+    var owed = rowsTotal(vs) - rowsPaid(vs);
+    h += '<div class="mcard'+(es.length?'':' empty')+'" onclick="go({view:\'month\',cid:\''+c.id+'\',mk:\''+mk+'\'})">'+
+      '<div class="mn">'+monthName(mk)+'</div>'+
+      '<div class="mv">'+fmt(worksValue(es))+'</div>'+
+      '<div class="ms">'+es.length+' propert'+(es.length===1?'y':'ies')+' · '+weeksInMonth(mk).length+' weeks'+
+        (owed>0?' · <span style="color:var(--red);font-weight:800">'+fmtShort(owed)+' owed</span>':'')+'</div>'+
+    '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function viewMonth(){
+  var c = contractor(route.cid); if(!c) return viewHome();
+  var mk = route.mk;
+  var weeks = weeksInMonth(mk);
+  var es = entriesFor(c.id,null,mk);
+
+  var h = crumbs([{t:'Contractors',go:{view:'home'}},{t:c.name,go:{view:'contractor',cid:c.id,year:mk.slice(0,4)}},{t:monthFull(mk)}]);
+  h += '<h2 class="page">'+monthFull(mk)+'</h2><p class="page">'+esc(c.name)+' — '+weeks.length+' weeks this month. Weeks run Monday to Sunday.</p>';
+
+  var rows = invRows(c.id,mk);
+  var invT = rowsTotal(rows), pd = rowsPaid(rows);
+  h += '<div class="stats">'+
+       stat('Month total', fmtShort(worksValue(es)),'')+
+       stat('Properties', String(es.length),'')+
+       stat('Paid', fmtShort(pd),'paid')+
+       stat('Outstanding', fmtShort(invT-pd),'out')+
+       '</div>';
+
+  var dg = dupGroups(es);
+  if(dg.length){
+    h += '<div class="dupbox"><div class="dt">⚠ '+dg.length+' possible repeat'+(dg.length===1?'':'s')+' this month</div>'+
+         '<div class="dl">Same address at the same price more than once. The invoice generator will ask you about each one before it bills it.</div></div>';
+  }
+
+  var mis = monthInvoicesFor(c.id,mk);
+  h += '<div class="sec"><h3>Monthly invoice</h3><button class="btn b-yellow editable" onclick="openGen(\''+c.id+'\',\''+mk+'\')">⚡ Generate monthly invoice</button></div>';
+  if(!mis.length){
+    h += '<div class="empty-state" style="padding:22px"><b>No monthly invoice raised yet</b>Generate one and it pulls in every property completed this month with its date and value.</div>';
+  } else {
+    h += '<div class="list">';
+    mis.forEach(function(v){
+      h += '<div class="row" onclick="viewMonthly(\''+v.id+'\')">'+
+        '<div class="rmain"><div class="rt">Invoice '+esc(v.number||'—')+'</div>'+
+        '<div class="rs">'+(v.lines?v.lines.length:0)+' propert'+((v.lines&&v.lines.length===1)?'y':'ies')+' · raised '+uk(v.dateRaised)+
+        ' &nbsp;<span class="pill '+statusClass(v.status)+'">'+esc(v.status)+'</span></div></div>'+
+        '<div class="ramt">'+fmt(v.amount)+'</div><div class="chev">›</div></div>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div class="sec"><h3>Weekly breakdown</h3><button class="btn b-ghost" onclick="exportCSV(\''+c.id+'\',\''+mk+'\')">Export month (CSV)</button></div>';
+
+  h += '<div class="list">';
+  weeks.forEach(function(w,i){
+    var we = entriesFor(c.id,w);
+    var wv = invoicesFor(c.id,w);
+    var chips = wv.length ? wv.map(function(v){return '<span class="pill '+statusClass(v.status)+'">'+esc(v.number||'No number')+' · '+esc(v.status)+'</span>';}).join(' ')
+                          : '<span class="pill p-none">No invoice yet</span>';
+    h += '<div class="row" onclick="go({view:\'week\',cid:\''+c.id+'\',mk:\''+mk+'\',week:\''+w+'\'})">'+
+      '<div class="rmain"><div class="rt">Week '+(i+1)+' · '+weekLabel(w)+'</div>'+
+      '<div class="rs">'+we.length+' propert'+(we.length===1?'y':'ies')+' &nbsp; '+chips+'</div></div>'+
+      '<div class="ramt">'+fmt(worksValue(we))+'</div><div class="chev">›</div></div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function viewWeek(){
+  var c = contractor(route.cid); if(!c) return viewHome();
+  var w = route.week, mk = route.mk;
+  var es = entriesFor(c.id,w).sort(function(a,b){return a.date<b.date?-1:1;});
+  var vs = invoicesFor(c.id,w);
+
+  var h = crumbs([{t:'Contractors',go:{view:'home'}},{t:c.name,go:{view:'contractor',cid:c.id,year:mk.slice(0,4)}},
+                  {t:monthFull(mk),go:{view:'month',cid:c.id,mk:mk}},{t:weekLabel(w)}]);
+  h += '<h2 class="page">'+weekLabel(w)+'</h2><p class="page">'+esc(c.name)+' — every property completed this week.</p>';
+
+  h += '<div class="sec"><h3>Properties</h3><div><button class="btn b-ghost" onclick="exportCSV(\''+c.id+'\',\''+mk+'\',\''+w+'\')">Export</button> <button class="btn b-primary editable" onclick="addEntry(\''+c.id+'\',\''+w+'\')">+ Add property</button></div></div>';
+
+  if(!es.length){
+    h += '<div class="empty-state"><b>Nothing logged for this week</b>Add the first property and its value.</div>';
+  } else {
+    var reps = dupIds(entriesFor(c.id,null,mk));
+    h += '<div class="tw"><table><thead><tr><th>Date</th><th>Property address</th><th>Job / UPRN ref</th><th>Work done</th><th class="num">Value</th><th></th></tr></thead><tbody>';
+    es.forEach(function(e){
+      h += '<tr><td>'+uk(e.date)+'</td><td><b>'+esc(e.address)+'</b>'+(reps[e.id]?'<span class="rep">REPEATED</span>':'')+'</td><td>'+esc(e.ref||'—')+'</td><td>'+esc(e.desc||'—')+'</td>'+
+           '<td class="num">'+fmt(e.amount)+'</td>'+
+           '<td class="num editable"><button class="tiny" onclick="editEntry(\''+e.id+'\')">Edit</button>'+
+           '<button class="tiny del" onclick="delEntry(\''+e.id+'\')">Delete</button></td></tr>';
+    });
+    h += '</tbody><tfoot><tr><td colspan="4">Week total — '+es.length+' propert'+(es.length===1?'y':'ies')+'</td><td class="num">'+fmt(worksValue(es))+'</td><td></td></tr></tfoot></table></div>';
+  }
+
+  h += '<div class="sec"><h3>Invoices for this week</h3><button class="btn b-yellow editable" onclick="addInvoice(\''+c.id+'\',\''+w+'\')">+ Add invoice</button></div>';
+  if(!vs.length){
+    h += '<div class="empty-state"><b>No invoice raised yet</b>Add the invoice number, the total and where it stands.</div>';
+  } else {
+    h += '<div class="tw"><table><thead><tr><th>Invoice no.</th><th>Submitted</th><th class="num">Amount</th><th class="num">Received</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody>';
+    vs.forEach(function(v){
+      h += '<tr><td><b>'+esc(v.number||'—')+'</b></td><td>'+(v.dateSent?uk(v.dateSent):'—')+'</td>'+
+        '<td class="num">'+fmt(v.amount)+'</td><td class="num">'+fmt(invPaid(v))+'</td>'+
+        '<td><span class="pill '+statusClass(v.status)+'">'+esc(v.status)+'</span></td>'+
+        '<td>'+esc(v.notes||'—')+'</td>'+
+        '<td class="num editable"><button class="tiny" onclick="editInvoice(\''+v.id+'\')">Edit</button>'+
+        '<button class="tiny del" onclick="delInvoice(\''+v.id+'\')">Delete</button></td></tr>';
+    });
+    var t=sum(vs,function(v){return v.amount;}), p=sum(vs,invPaid);
+    h += '</tbody><tfoot><tr><td colspan="2">Totals</td><td class="num">'+fmt(t)+'</td><td class="num">'+fmt(p)+'</td><td colspan="3">'+fmt(t-p)+' outstanding</td></tr></tfoot></table></div>';
+  }
+  return h;
+}
+
+function viewInvoices(){
+  var fc = route.fc||'', fs = route.fs||'', ft = route.ft||'';
+  var list = invRows(fc||null, null);
+  if(fs) list = list.filter(function(x){return x.r.status===fs;});
+  if(ft) list = list.filter(function(x){return x.type===ft;});
+  list.sort(function(a,b){return a.mk<b.mk?1:-1;});
+
+  var t = rowsTotal(list), p = rowsPaid(list);
+  var h = '<h2 class="page">All invoices</h2><p class="page">What has been raised, what has landed, and what is still owed.</p>';
+  h += '<div class="stats">'+stat('Invoices',String(list.length),'')+stat('Value',fmtShort(t),'')+stat('Received',fmtShort(p),'paid')+stat('Outstanding',fmtShort(t-p),'out')+'</div>';
+
+  var sel = 'padding:8px 10px;border-radius:9px;border:1.5px solid var(--line);font-weight:700;margin-right:6px';
+  h += '<div class="sec"><h3>Filter</h3><div>';
+  h += '<select style="'+sel+'" onchange="go({view:\'invoices\',fc:this.value,fs:\''+fs+'\',ft:\''+ft+'\'})"><option value="">All contractors</option>';
+  DB.contractors.forEach(function(c){h+='<option value="'+c.id+'"'+(fc===c.id?' selected':'')+'>'+esc(c.name)+'</option>';});
+  h += '</select>';
+  h += '<select style="'+sel+'" onchange="go({view:\'invoices\',fc:\''+fc+'\',fs:this.value,ft:\''+ft+'\'})"><option value="">All statuses</option>';
+  STATUSES.forEach(function(st){h+='<option'+(fs===st?' selected':'')+'>'+st+'</option>';});
+  h += '</select>';
+  h += '<select style="'+sel+'" onchange="go({view:\'invoices\',fc:\''+fc+'\',fs:\''+fs+'\',ft:this.value})"><option value="">Weekly + monthly</option>';
+  ['Weekly','Monthly'].forEach(function(tp){h+='<option'+(ft===tp?' selected':'')+'>'+tp+'</option>';});
+  h += '</select></div></div>';
+
+  if(!list.length) return h + '<div class="empty-state"><b>No invoices here yet</b>Raise one against a week, or generate a monthly invoice from a month page.</div>';
+
+  h += '<div class="tw"><table><thead><tr><th>Invoice no.</th><th>Type</th><th>Contractor</th><th>Period</th><th class="num">Amount</th><th class="num">Received</th><th>Status</th><th></th></tr></thead><tbody>';
+  list.forEach(function(x){
+    var v = x.r, c = contractor(v.contractorId);
+    var open = x.type==='Monthly'
+      ? 'viewMonthly(\''+v.id+'\')'
+      : 'go({view:\'week\',cid:\''+v.contractorId+'\',mk:\''+x.mk+'\',week:\''+v.week+'\'})';
+    h += '<tr><td><b>'+esc(v.number||'—')+'</b></td>'+
+      '<td><span class="pill '+(x.type==='Monthly'?'p-pend':'p-none')+'">'+x.type+'</span></td>'+
+      '<td>'+esc(c?c.name:'—')+'</td>'+
+      '<td><a style="color:var(--navy);font-weight:700;cursor:pointer" onclick="'+open+'">'+x.period+'</a></td>'+
+      '<td class="num">'+fmt(v.amount)+'</td><td class="num">'+fmt(invPaid(v))+'</td>'+
+      '<td><span class="pill '+statusClass(v.status)+'">'+esc(v.status)+'</span></td>'+
+      '<td class="num editable">'+
+        (x.type==='Monthly'
+          ? '<button class="tiny" onclick="editMonthly(\''+v.id+'\')">Edit</button><button class="tiny del" onclick="delMonthly(\''+v.id+'\')">Delete</button>'
+          : '<button class="tiny" onclick="editInvoice(\''+v.id+'\')">Edit</button><button class="tiny del" onclick="delInvoice(\''+v.id+'\')">Delete</button>')+
+      '</td></tr>';
+  });
+  h += '</tbody><tfoot><tr><td colspan="4">Totals</td><td class="num">'+fmt(t)+'</td><td class="num">'+fmt(p)+'</td><td colspan="2">'+fmt(t-p)+' outstanding</td></tr></tfoot></table></div>';
+  return h;
+}
+
+/* ─────────────────────────── modals ─────────────────────────── */
+function openModal(title, body){
+  document.getElementById('mtitle').textContent = title;
+  document.getElementById('mbody').innerHTML = body;
+  document.getElementById('mbg').className = 'mbg on';
+  modalOpen = true;
+}
+function closeModal(){ document.getElementById('mbg').className='mbg'; modalOpen=false; if(pendingRender){pendingRender=false;render();} }
+function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+
+function addContractor(){
+  openModal('Add contractor',
+    '<div class="f"><label>Contractor name</label><input id="i-cname" placeholder="e.g. Ealing Council" autofocus></div>'+
+    '<button class="btn b-primary" style="width:100%" onclick="saveContractor()">Add contractor</button>');
+}
+function saveContractor(){
+  var nm = val('i-cname');
+  if(!nm){toast('Give the contractor a name first');return;}
+  closeModal();
+  save('contractors/'+uid('c'), {name:nm}, nm+' added');
+}
+function renameContractor(id){
+  var c = contractor(id); if(!c) return;
+  openModal('Rename contractor',
+    '<div class="f"><label>Contractor name</label><input id="i-cname" value="'+esc(c.name)+'"></div>'+
+    '<div class="hintline">All weeks, properties and invoices under this contractor stay exactly where they are.</div>'+
+    '<button class="btn b-primary" style="width:100%" onclick="saveRename(\''+id+'\')">Save name</button>');
+}
+function saveRename(id){
+  var nm = val('i-cname');
+  if(!nm){toast('Give the contractor a name first');return;}
+  closeModal();
+  save('contractors/'+id+'/name', nm, 'Name updated');
+}
+
+function delContractor(id){
+  var c = contractor(id); if(!c) return;
+  var count = DB.entries.filter(function(e){return e.contractorId===id;}).length;
+  if(!confirm('Remove '+c.name+'? This also removes '+count+' property record(s) and their invoices. You can undo it straight after.')) return;
+  var backup = {
+    contractor: JSON.parse(JSON.stringify(c)),
+    entries: JSON.parse(JSON.stringify(DB.entries.filter(function(x){return x.contractorId===id;}))),
+    invoices: JSON.parse(JSON.stringify(DB.invoices.filter(function(x){return x.contractorId===id;})))
+  };
+  if(route.cid===id) route = {view:'home'};
+  var del = {}; del['contractors/'+id] = null;
+  backup.entries.forEach(function(e){ del['entries/'+e.id] = null; });
+  backup.invoices.forEach(function(v){ del['invoices/'+v.id] = null; });
+  applyUpdate(del);
+  toastUndo(c.name+' removed', function(){
+    var put = {}; put['contractors/'+id] = {name:backup.contractor.name};
+    backup.entries.forEach(function(e){ put['entries/'+e.id] = e; });
+    backup.invoices.forEach(function(v){ put['invoices/'+v.id] = v; });
+    applyUpdate(put, c.name+' restored');
+  });
+}
+
+function contractorOptions(sel){
+  return DB.contractors.map(function(c){
+    return '<option value="'+c.id+'"'+(c.id===sel?' selected':'')+'>'+esc(c.name)+'</option>';
+  }).join('');
+}
+
+function entryForm(e,cid,week){
+  var d = e || {date: week ? week : today(), address:'', ref:'', desc:'', amount:''};
+  return '<div class="f"><label>Property address</label><input id="i-addr" value="'+esc(d.address)+'" placeholder="e.g. 12 High Street, London W4 1AA"></div>'+
+    '<div class="f2"><div class="f"><label>Date completed</label><input id="i-date" type="date" value="'+esc(d.date)+'"></div>'+
+    '<div class="f"><label>Value (£)</label><input id="i-amt" type="number" step="0.01" inputmode="decimal" value="'+esc(d.amount)+'" placeholder="0.00"></div></div>'+
+    '<div class="f"><label>Contractor</label><select id="i-cont">'+contractorOptions(cid)+'</select></div>'+
+    '<div class="hintline">Logged under the wrong contractor or in the wrong week? Change either one here and the record moves with its value.</div>'+
+    '<div class="f2"><div class="f"><label>Job / UPRN ref</label><input id="i-ref" value="'+esc(d.ref)+'" placeholder="Optional"></div>'+
+    '<div class="f"><label>Work done</label><input id="i-desc" value="'+esc(d.desc)+'" placeholder="e.g. Void EICR + remedials"></div></div>'+
+    '<button class="btn b-primary" style="width:100%" onclick="saveEntry(\''+(e?e.id:'')+'\')">Save property</button>';
+}
+function addEntry(cid,week){ openModal('Add property', entryForm(null,cid,week)); }
+function editEntry(id){
+  var e=null; DB.entries.forEach(function(x){if(x.id===id)e=x;});
+  if(!e) return;
+  openModal('Edit property', entryForm(e,e.contractorId,weekStartFor(e.date)));
+}
+function saveEntry(id){
+  var addr=val('i-addr'), date=val('i-date'), amt=val('i-amt'), cid=val('i-cont');
+  if(!addr){toast('Enter the property address');return;}
+  if(!date){toast('Enter the date the work was done');return;}
+  if(!cid){toast('Choose a contractor');return;}
+  var was = null; DB.entries.forEach(function(x){if(x.id===id)was=x;});
+  var rec = {address:addr, date:date, amount:n(amt), ref:val('i-ref'), desc:val('i-desc'), contractorId:cid};
+  var moved = was && (weekStartFor(was.date)!==weekStartFor(date) || was.contractorId!==cid);
+  closeModal();
+  save('entries/'+(id||uid('e')), rec,
+    moved ? ('Moved to '+contractor(cid).name+', week of '+ukShort(weekStartFor(date)))
+          : (id?'Property updated':'Property added'));
+}
+function delEntry(id){
+  var e=null; DB.entries.forEach(function(x){if(x.id===id)e=x;});
+  if(!e) return;
+  var backup = JSON.parse(JSON.stringify(e));
+  wipe('entries/'+id);
+  toastUndo('Deleted '+(e.address.length>26?e.address.slice(0,26)+'…':e.address), function(){
+    save('entries/'+id, backup, 'Property restored');
+  });
+}
+
+function invoiceForm(v,cid,week){
+  var weekTotal = worksValue(entriesFor(cid,week));
+  var d = v || {number:'', amount:weekTotal||'', status:'Pending', paid:'', dateSent:today(), datePaid:'', notes:''};
+  var opts = STATUSES.map(function(s){return '<option'+(d.status===s?' selected':'')+'>'+s+'</option>';}).join('');
+  return '<div class="f2"><div class="f"><label>Invoice number</label><input id="i-num" value="'+esc(d.number)+'" placeholder="Your own reference"></div>'+
+    '<div class="f"><label>Invoice amount (£)</label><input id="i-iamt" type="number" step="0.01" inputmode="decimal" value="'+esc(d.amount)+'"></div></div>'+
+    (v?'':'<div class="hintline">Pre-filled with this week\'s total of '+fmt(weekTotal)+' — change it if you invoiced a different figure.</div>')+
+    '<div class="f2"><div class="f"><label>Status</label><select id="i-stat" onchange="togglePaidField()">'+opts+'</select></div>'+
+    '<div class="f" id="paidwrap" style="display:'+(d.status==='Partially Paid'?'block':'none')+'"><label>Amount received (£)</label><input id="i-paid" type="number" step="0.01" inputmode="decimal" value="'+esc(d.paid)+'"></div></div>'+
+    '<div class="f2"><div class="f"><label>Date submitted</label><input id="i-sent" type="date" value="'+esc(d.dateSent)+'"></div>'+
+    '<div class="f"><label>Date paid</label><input id="i-pdate" type="date" value="'+esc(d.datePaid)+'"></div></div>'+
+    '<div class="f"><label>Notes</label><input id="i-inotes" value="'+esc(d.notes)+'" placeholder="e.g. queried by QS, resubmitted"></div>'+
+    '<div class="f2"><div class="f"><label>Contractor</label><select id="i-icont">'+contractorOptions(cid)+'</select></div>'+
+    '<div class="f"><label>Week (any date in it)</label><input id="i-iweek" type="date" value="'+esc(week)+'"></div></div>'+
+    '<div class="hintline">Raised against the wrong week? Pick any date inside the right one and the invoice moves there.</div>'+
+    '<button class="btn b-primary" style="width:100%" onclick="saveInvoice(\''+(v?v.id:'')+'\')">Save invoice</button>';
+}
+function togglePaidField(){
+  var s = val('i-stat');
+  document.getElementById('paidwrap').style.display = (s==='Partially Paid') ? 'block' : 'none';
+}
+function addInvoice(cid,week){ openModal('Add invoice', invoiceForm(null,cid,week)); }
+function editInvoice(id){
+  var v=null; DB.invoices.forEach(function(x){if(x.id===id)v=x;});
+  if(!v) return;
+  openModal('Edit invoice', invoiceForm(v,v.contractorId,v.week));
+}
+function saveInvoice(id){
+  var num=val('i-num'), cid=val('i-icont'), wk=val('i-iweek');
+  if(!cid){toast('Choose a contractor');return;}
+  if(!wk){toast('Pick a date inside the week this invoice covers');return;}
+  var week = weekStartFor(wk);
+  var rec = {contractorId:cid, week:week, number:num, amount:n(val('i-iamt')),
+             status:val('i-stat')||'Pending', paid:n(val('i-paid')),
+             dateSent:val('i-sent'), datePaid:val('i-pdate'), notes:val('i-inotes')};
+  if(rec.status==='Paid') rec.paid = rec.amount;
+  if(rec.status!=='Partially Paid' && rec.status!=='Paid') rec.paid = 0;
+  closeModal();
+  save('invoices/'+(id||uid('v')), rec, id?'Invoice updated':'Invoice added');
+}
+function delInvoice(id){
+  var v=null; DB.invoices.forEach(function(x){if(x.id===id)v=x;});
+  if(!v) return;
+  var backup = JSON.parse(JSON.stringify(v));
+  wipe('invoices/'+id);
+  toastUndo('Deleted invoice '+(v.number||'(no number)'), function(){
+    save('invoices/'+id, backup, 'Invoice restored');
+  });
+}
+
+
+/* ────────────────── monthly invoice generator ────────────────── */
+var GEN = null;
+
+function openGen(cid,mk){
+  var es = entriesFor(cid,null,mk).sort(function(a,b){return a.date<b.date?-1:1;});
+  if(!es.length){ toast('No properties logged for this month yet'); return; }
+  var groups = dupGroups(es);
+  var gi = {};
+  groups.forEach(function(g,i){ g.items.forEach(function(e){ gi[e.id]=i; }); });
+  GEN = {
+    cid: cid, mk: mk, editing: null,
+    lines: es.map(function(e){
+      return {id:e.id, address:e.address, date:e.date, ref:e.ref||'', desc:e.desc||'',
+              amount:n(e.amount), include:true, group:(gi[e.id]===undefined?-1:gi[e.id])};
+    }),
+    groups: groups.map(function(g){ return {addr:g.items[0].address, amount:n(g.items[0].amount), count:g.items.length, answer:null}; })
+  };
+  openModal('Generate monthly invoice', '<div id="genbody"></div>');
+  renderGen();
+}
+
+function renderGen(){
+  var g = GEN, unanswered = 0;
+  var h = '<div class="f2"><div class="f"><label>Invoice number</label><input id="i-mnum" value="'+esc(g.number||'')+'" placeholder="Your own reference" oninput="GEN.number=this.value"></div>'+
+          '<div class="f"><label>Date raised</label><input id="i-mdate" type="date" value="'+esc(g.dateRaised||today())+'" oninput="GEN.dateRaised=this.value"></div></div>'+
+          '<div class="f"><label>Status</label><select id="i-mstat">'+
+            STATUSES.map(function(st){return '<option'+((g.status||'Pending')===st?' selected':'')+'>'+st+'</option>';}).join('')+
+          '</select></div>';
+
+  g.groups.forEach(function(gr,i){
+    if(gr.answer===null) unanswered++;
+    h += '<div class="dupbox'+(gr.answer?' done':'')+'">'+
+      '<div class="dt">'+(gr.answer?'✓ Repeat handled':'⚠ Possible repeat')+'</div>'+
+      '<div class="dl"><b>'+esc(gr.addr)+'</b> appears '+gr.count+' times this month at the same price of '+fmt(gr.amount)+'.'+
+      (gr.answer==='keep' ? ' Billing all '+gr.count+'.' : gr.answer==='remove' ? ' Billing it once only.' : ' Do you still want to bill it more than once?')+'</div>'+
+      (gr.answer ? '<button class="btn b-ghost" onclick="answerDup('+i+',null)">Change answer</button>'
+                 : '<button class="btn b-primary" onclick="answerDup('+i+',\'keep\')">Yes, bill them all</button>'+
+                   '<button class="btn b-danger" onclick="answerDup('+i+',\'remove\')">No, bill it once</button>')+
+    '</div>';
+  });
+
+  h += '<div class="sec"><h3>Properties on this invoice</h3><span style="font-size:12px;color:var(--mute)">Untick to leave one off</span></div>';
+  var total = 0;
+  g.lines.forEach(function(l,i){
+    if(l.include) total += l.amount;
+    h += '<div class="gl'+(l.include?'':' off')+'">'+
+      '<input type="checkbox" '+(l.include?'checked':'')+' onchange="toggleGenLine('+i+')">'+
+      '<div class="ga"><b>'+esc(l.address)+'</b>'+(l.group>-1?'<span class="rep">REPEATED</span>':'')+
+      '<div style="font-size:11px;color:var(--mute);margin-top:2px">'+uk(l.date)+(l.ref?' · '+esc(l.ref):'')+'</div></div>'+
+      '<div class="gv">'+fmt(l.amount)+'</div></div>';
+  });
+  h += '<div class="gtot"><span>Invoice total</span><span>'+fmt(total)+'</span></div>';
+
+  h += unanswered
+    ? '<div class="hintline" style="color:var(--red);font-weight:700">Answer the repeat check'+(unanswered>1?'s':'')+' above before generating.</div>'+
+      '<button class="btn b-ghost" style="width:100%" disabled>Generate invoice</button>'
+    : '<button class="btn b-primary" style="width:100%" onclick="saveMonthly()">Generate invoice</button>';
+
+  document.getElementById('genbody').innerHTML = h;
+}
+
+function answerDup(i,ans){
+  var gr = GEN.groups[i];
+  gr.answer = ans;
+  if(ans){
+    var seen = false;
+    GEN.lines.forEach(function(l){
+      if(l.group!==i) return;
+      if(ans==='keep'){ l.include = true; }
+      else { l.include = !seen; seen = true; }   // keep the first, drop the rest
+    });
+  }
+  GEN.number = val('i-mnum'); GEN.dateRaised = val('i-mdate'); GEN.status = val('i-mstat');
+  renderGen();
+}
+function toggleGenLine(i){
+  GEN.lines[i].include = !GEN.lines[i].include;
+  GEN.number = val('i-mnum'); GEN.dateRaised = val('i-mdate'); GEN.status = val('i-mstat');
+  renderGen();
+}
+
+function saveMonthly(){
+  var num = val('i-mnum');
+  if(!num){ toast('Put your invoice number in first'); return; }
+  var lines = GEN.lines.filter(function(l){return l.include;})
+    .map(function(l){ return {entryId:l.id, address:l.address, date:l.date, ref:l.ref, desc:l.desc, amount:l.amount}; });
+  if(!lines.length){ toast('Tick at least one property'); return; }
+  var rec = {
+    contractorId: GEN.cid, month: GEN.mk, number: num,
+    dateRaised: val('i-mdate') || today(),
+    status: val('i-mstat') || 'Pending',
+    paid: 0, datePaid: '', notes: '',
+    amount: sum(lines,function(l){return l.amount;}),
+    lines: lines
+  };
+  var id = GEN.editing || uid('m');
+  closeModal();
+  save('minvoices/'+id, rec, 'Invoice '+num+' generated');
+}
+
+/* ────────────────── viewing, editing, printing ────────────────── */
+function findMonthly(id){ var r=null; DB.minvoices.forEach(function(x){if(x.id===id)r=x;}); return r; }
+
+function viewMonthly(id){
+  var v = findMonthly(id); if(!v) return;
+  openModal('Invoice '+(v.number||''),
+    '<div class="doc">'+invoiceDoc(v)+'</div>'+
+    '<div class="arow" style="margin-top:16px">'+
+      '<button class="btn b-primary" onclick="printMonthly(\''+id+'\')">🖨 Print / Save as PDF</button>'+
+      '<button class="btn b-ghost editable" onclick="editMonthly(\''+id+'\')">Edit details</button>'+
+      '<button class="btn b-ghost" onclick="exportMonthlyCSV(\''+id+'\')">CSV</button>'+
+      '<button class="btn b-danger editable" onclick="delMonthly(\''+id+'\')">Delete</button>'+
+    '</div>');
+}
+
+function invoiceDoc(v){
+  var c = contractor(v.contractorId);
+  var h = '<div class="lh"><div>'+
+      '<div class="co">LEON ELECTRICIANS LTD</div>'+
+      '<div class="cd">Unit 104, The Light Box, 111 Power Road<br>Chiswick, London W4 5PY<br>'+
+      '07360 008914 · info@leonelectricians.co.uk<br>NICEIC Approved Contractor</div>'+
+    '</div><div class="it"><div class="ti">INVOICE</div><div class="tn">'+
+      '<b>No: '+esc(v.number||'—')+'</b><br>Date: '+uk(v.dateRaised)+'<br>Period: '+monthFull(v.month)+
+    '</div></div></div>';
+  h += '<div class="to"><b>Invoice to:</b><br>'+esc(c?c.name:'—')+'</div>';
+  h += '<table><thead><tr><th>#</th><th>Property address</th><th>Completed</th><th>Ref</th><th class="tr">Value</th></tr></thead><tbody>';
+  (v.lines||[]).forEach(function(l,i){
+    h += '<tr><td>'+(i+1)+'</td><td>'+esc(l.address)+'</td><td>'+uk(l.date)+'</td><td>'+esc(l.ref||'')+'</td><td class="tr">'+fmt(l.amount)+'</td></tr>';
+  });
+  h += '<tr class="tot"><td colspan="4">TOTAL — '+(v.lines?v.lines.length:0)+' properties</td><td class="tr">'+fmt(v.amount)+'</td></tr>';
+  h += '</tbody></table>';
+  if(v.status!=='Pending') h += '<div style="margin-top:10px;font-size:12px"><b>Status:</b> '+esc(v.status)+(invPaid(v)?' · received '+fmt(invPaid(v)):'')+'</div>';
+  if(v.notes) h += '<div style="margin-top:6px;font-size:12px"><b>Notes:</b> '+esc(v.notes)+'</div>';
+  h += '<div class="ft">Leon Electricians Ltd · NICEIC · CHAS Advanced · SSIP · ECA · OZEV<br>Payment terms as per contract. Please quote the invoice number on remittance.</div>';
+  return h;
+}
+
+function printMonthly(id){
+  var v = findMonthly(id); if(!v) return;
+  document.getElementById('printarea').innerHTML = '<div class="doc">'+invoiceDoc(v)+'</div>';
+  window.print();
+}
+
+function editMonthly(id){
+  var v = findMonthly(id); if(!v) return;
+  openModal('Edit invoice '+(v.number||''),
+    '<div class="f2"><div class="f"><label>Invoice number</label><input id="e-num" value="'+esc(v.number)+'"></div>'+
+    '<div class="f"><label>Invoice total (£)</label><input id="e-amt" type="number" step="0.01" value="'+esc(v.amount)+'"></div></div>'+
+    '<div class="f2"><div class="f"><label>Status</label><select id="e-stat" onchange="document.getElementById(\'e-paidwrap\').style.display=this.value===\'Partially Paid\'?\'block\':\'none\'">'+
+      STATUSES.map(function(st){return '<option'+(v.status===st?' selected':'')+'>'+st+'</option>';}).join('')+'</select></div>'+
+    '<div class="f" id="e-paidwrap" style="display:'+(v.status==='Partially Paid'?'block':'none')+'"><label>Amount received (£)</label><input id="e-paid" type="number" step="0.01" value="'+esc(v.paid||'')+'"></div></div>'+
+    '<div class="f2"><div class="f"><label>Date raised</label><input id="e-raised" type="date" value="'+esc(v.dateRaised)+'"></div>'+
+    '<div class="f"><label>Date paid</label><input id="e-pdate" type="date" value="'+esc(v.datePaid||'')+'"></div></div>'+
+    '<div class="f"><label>Notes</label><input id="e-notes" value="'+esc(v.notes||'')+'"></div>'+
+    '<div class="hintline">The property list stays as generated. To rebuild it, delete this invoice and generate again.</div>'+
+    '<button class="btn b-primary" style="width:100%" onclick="saveMonthlyEdit(\''+id+'\')">Save invoice</button>');
+}
+
+function saveMonthlyEdit(id){
+  var v = findMonthly(id); if(!v) return;
+  var rec = JSON.parse(JSON.stringify(v));
+  delete rec.id;
+  rec.number = val('e-num'); rec.amount = n(val('e-amt'));
+  rec.status = val('e-stat'); rec.paid = n(val('e-paid'));
+  rec.dateRaised = val('e-raised'); rec.datePaid = val('e-pdate'); rec.notes = val('e-notes');
+  if(rec.status==='Paid') rec.paid = rec.amount;
+  if(rec.status!=='Partially Paid' && rec.status!=='Paid') rec.paid = 0;
+  closeModal();
+  save('minvoices/'+id, rec, 'Invoice updated');
+}
+
+function delMonthly(id){
+  var v = findMonthly(id); if(!v) return;
+  var backup = JSON.parse(JSON.stringify(v)); delete backup.id;
+  closeModal();
+  wipe('minvoices/'+id);
+  toastUndo('Deleted invoice '+(v.number||''), function(){ save('minvoices/'+id, backup, 'Invoice restored'); });
+}
+
+function exportMonthlyCSV(id){
+  var v = findMonthly(id); if(!v) return;
+  var c = contractor(v.contractorId);
+  var rows = [['Invoice','Contractor','Period','Property address','Completed','Ref','Value (£)']];
+  (v.lines||[]).forEach(function(l){
+    rows.push([v.number, c?c.name:'', monthFull(v.month), l.address, uk(l.date), l.ref||'', n(l.amount).toFixed(2)]);
+  });
+  rows.push(['','','','TOTAL','','', n(v.amount).toFixed(2)]);
+  var csv = '\uFEFF'+rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=('Invoice_'+(v.number||v.month)+'.csv').replace(/[^a-zA-Z0-9_.-]/g,'_');
+  a.click();
+  toast('CSV downloaded');
+}
+
+/* ─────────────────────────── export ─────────────────────────── */
+function csvCell(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';}
+function exportCSV(cid,mk,week){
+  var c = contractor(cid);
+  var rows = [['Contractor','Month','Week','Date','Property address','Job / UPRN ref','Work done','Value (£)','Invoice no.','Invoice status']];
+  var weeks = week ? [week] : weeksInMonth(mk);
+  weeks.forEach(function(w){
+    var vs = invoicesFor(cid,w);
+    var inum = vs.map(function(v){return v.number;}).join(' / ');
+    var ist  = vs.map(function(v){return v.status;}).join(' / ');
+    entriesFor(cid,w).forEach(function(e){
+      rows.push([c.name, monthFull(mk), weekLabel(w), uk(e.date), e.address, e.ref||'', e.desc||'', n(e.amount).toFixed(2), inum, ist]);
+    });
+    rows.push(['','',weekLabel(w)+' TOTAL','','','','', worksValue(entriesFor(cid,w)).toFixed(2), inum, ist]);
+  });
+  rows.push(['','',monthFull(mk)+' TOTAL','','','','', worksValue(entriesFor(cid,null,mk)).toFixed(2),'','']);
+  var csv = '\uFEFF' + rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = (c.name+'_'+mk+(week?'_wk'+week:'')+'.csv').replace(/[^a-zA-Z0-9_.-]/g,'_');
+  a.click();
+  toast('CSV downloaded');
+}
+
+/* ─────────────────────────── misc ─────────────────────────── */
+function toast(m){
+  var t=document.getElementById('toast');
+  t.textContent=m; t.style.pointerEvents='none'; t.className='on';
+  clearTimeout(t._t); t._t=setTimeout(function(){t.className='';},2600);
+}
+function toastUndo(m,restore){
+  var t=document.getElementById('toast');
+  t.innerHTML = esc(m)+' <button id="undob" style="background:var(--yellow);color:var(--navy);border:0;border-radius:999px;padding:5px 13px;font-weight:800;font-size:12px;margin-left:8px;cursor:pointer">Undo</button>';
+  t.style.pointerEvents='auto'; t.className='on';
+  document.getElementById('undob').onclick=function(){ hideToast(); restore(); };
+  clearTimeout(t._t); t._t=setTimeout(hideToast, 9000);
+}
+function hideToast(){
+  var t=document.getElementById('toast');
+  t.className=''; t.style.pointerEvents='none';
+}
+function toggleRO(){
+  var on = !document.body.classList.contains('ro');
+  document.body.classList.toggle('ro', on);
+  document.getElementById('robtn').textContent = 'View only: ' + (on?'on':'off');
+  toast(on ? 'View only — editing hidden on this device' : 'Editing switched back on');
+}
+
+/* ─────────────────────────── connect ─────────────────────────── */
+function fatal(title, detail){
+  document.getElementById('synced').textContent = 'Not connected';
+  document.getElementById('app').innerHTML =
+    '<div class="empty-state" style="border-color:#fecaca;background:#fff5f5">'+
+    '<b style="color:var(--red)">'+title+'</b>'+detail+'</div>';
+}
+
+(function(){
+  if(!FB_OK){
+    fatal('Cannot reach the database',
+      'The Firebase library did not load. This usually means the page is being previewed somewhere that blocks outside scripts, or there is no internet connection.<br><br>'+
+      'Open the live link instead:<br><b>kainatnaseer-khan.github.io/invoice-tracker/</b>');
+    return;
+  }
+  render();
+  var connected = false;
+  if(auth && auth.signInAnonymously){
+    auth.signInAnonymously().then(watchData).catch(watchData);
+  } else {
+    watchData();
+  }
+  rtdb.ref('.info/connected').on('value', function(sn){ if(sn.val()) connected = true; });
+  setTimeout(function(){
+    if(!connected){
+      fatal('Connected to the internet, but not to your data',
+        'Two things to check in the Firebase console:<br><br>'+
+        '<b>1.</b> Authentication → Sign-in method → <b>Anonymous</b> is switched on.<br>'+
+        '<b>2.</b> Realtime Database → Rules → published, not left on expired test mode.<br><br>'+
+        'Fix either one and refresh this page.');
+    }
+  }, 10000);
+})();
+
+</script>
+</body>
+</html>
