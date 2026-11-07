@@ -655,7 +655,15 @@ function saveJob(){
   if(!j.entryId) j.entryId = null;
   map[ROOT+'/jobs/'+id] = j;
   closeModal();
-  applyUpdate(map, (isNew ? 'Job added' : 'Job saved') + (note ? ' · '+note : ''));
+  var label = isNew ? 'Job added' : 'Job saved';
+  var linked = Object.keys(map).length > 1;
+  rtdb.ref().update(map).then(function(){ toast(label + (note ? ' · '+note : '')); })
+    .catch(function(){
+      if(!linked){ toast('Could not save — check your connection'); return; }
+      // the invoice app part was refused — still save the job itself, unlinked
+      var only = {}; j.entryId = old && old.entryId ? old.entryId : null; only[ROOT+'/jobs/'+id] = j;
+      applyUpdate(only, label + ' · could not send to invoice app');
+    });
 }
 function delJob(){
   var id = EDIT, j=null; DB.jobs.forEach(function(x){ if(x.id===id) j=x; }); if(!j) return;
