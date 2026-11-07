@@ -1287,12 +1287,17 @@ function setCode(entryId, codeId, field, value){
   var list = codesOf(e), was = n(e.amount);
   list.forEach(function(k){
     if(k.id!==codeId) return;
+    /* the price typed in the table is the LINE TOTAL (already qty × unit rate), as on the sheets
+       sent to the office — store it as a unit rate so nothing gets multiplied twice */
+    if(field==='total'){ var q0 = n(k.qty) || 1; k.rate = r2(n(value)/q0*10000)/10000; return; }
+    /* changing the quantity keeps the line total the same: the sheet's total is the figure that counts */
+    if(field==='qty'){ var oldTot = n(k.qty)*n(k.rate), nq = n(value); k.qty = nq; if(nq) k.rate = Math.round(oldTot/nq*10000)/10000; return; }
     k[field] = value;
     if(field==='status' && value==='Amended' && (k.apprQty===''||k.apprQty==null)) k.apprQty = k.qty;
     if(field==='status' && value!=='Amended') k.apprQty = '';
   });
   var now = r2(sum(list,codeValue));
-  var msg = (field==='status' || field==='apprQty' || field==='qty' || field==='rate')
+  var msg = (field==='status' || field==='apprQty' || field==='qty' || field==='rate' || field==='total')
     ? (Math.abs(now-was)>0.004 ? 'Saved · property now '+fmt(now)+' (was '+fmt(was)+')'+
         (DB.minvoices.some(function(v){ return linesOf(v).some(function(x){ return x.l.entryId===entryId; }); })?' · invoice updated':'') : 'Saved')
     : 'Saved';
@@ -1329,17 +1334,20 @@ function cmLookup(){
   if(!h) return;
   var d = document.getElementById('cm-desc'), r = document.getElementById('cm-rate');
   if(d && !d.value) d.value = h.desc || '';
-  if(r && !r.value) r.value = h.rate || '';
+  if(r && (!r.value || r.dataset.auto==='1') && h.rate){ r.value = r2(n(h.rate)*(n(val('cm-qty'))||1)); r.dataset.auto = '1'; }
 }
+/* typing a quantity after the code re-works the suggested total; a total typed by hand is left alone */
+function cmQty(){ var r = document.getElementById('cm-rate'); if(r && r.dataset.auto==='1'){ r.value=''; cmLookup(); } }
 function addCodeRow(){
   var e = findEntry(CM.id); if(!e) return;
   var code = val('cm-code').replace(/\s/g,'');
   if(!/^\d{6}$/.test(code)){ toast('SOR codes are exactly 6 digits — put the quantity in Qty'); return; }
-  var qty = val('cm-qty'), rate = val('cm-rate');
-  if(!qty){ toast('Enter the quantity'); return; }
-  if(rate===''){ toast('Enter the rate'); return; }
+  var qty = val('cm-qty'), total = val('cm-rate');
+  if(!n(qty)){ toast('Enter the quantity'); return; }
+  if(total===''){ toast('Enter the total for this code'); return; }
   var list = codesOf(e);
-  list.push({code:code, desc:val('cm-desc'), qty:n(qty), rate:n(rate), status:'Pending'});
+  // the price box is the line total (qty × unit rate already worked out) — store the unit rate
+  list.push({code:code, desc:val('cm-desc'), qty:n(qty), rate:Math.round(n(total)/n(qty)*10000)/10000, status:'Pending'});
   CM.keep = {};   // clear the add row after saving
   writeCodes(e.id, list, 'Code '+code+' added');
 }
@@ -1368,8 +1376,18 @@ function parseCodeLines(txt, hist){
       rest.slice(j).forEach(function(s){ if(isNum(s)) nums.push(n(s.replace(/[£,]/g,''))); });
     }
     var h = hist[code] || {};
-    var qty = nums.length ? nums[0] : 1;
-    var rate = nums.length>1 ? nums[1] : (h.rate!=null ? n(h.rate) : 0);
+    var qty = nums.length ? (nums[0] || 1) : 1;
+    /* the price on the sheet is the LINE TOTAL (qty × unit rate already worked out).
+       Qty, Total → unit rate = Total ÷ Qty.  Qty, Rate, Total → the last figure is the total.
+       Only a quantity → the unit rate used before for this code. */
+    var rate;
+    if(nums.length>=3) rate = nums[nums.length-1]/qty;
+    else if(nums.length===2){
+      var p = nums[1], known = h.rate!=null ? n(h.rate) : 0;
+      // a figure that matches the unit rate used before for this code really is a unit rate
+      rate = (qty!==1 && known && Math.abs(p-known)<0.02) ? p : p/qty;
+    } else rate = h.rate!=null ? n(h.rate) : 0;
+    rate = Math.round(rate*10000)/10000;
     out.push({code:code, desc:words.join(' ') || h.desc || '', qty:qty, rate:rate, status:'Pending'});
   });
   return {rows:out, skipped:skipped};
@@ -1432,11 +1450,12 @@ function codeRow(eid,k,full,locked){
   var qty = full
     ? '<input class="cm-in qn" type="number" step="0.01" value="'+esc(k.qty)+'" onchange="setCode(\''+eid+'\',\''+k.id+'\',\'qty\',this.value)">'
     : esc(k.qty);
-  var rate = full
-    ? '<input class="cm-in rn" type="number" step="0.01" value="'+esc(k.rate)+'" onchange="setCode(\''+eid+'\',\''+k.id+'\',\'rate\',this.value)">'
-    : fmt(k.rate);
+  var rate = fmt(k.rate);
+  var claimed = full
+    ? '<input class="cm-in rn" type="number" step="0.01" value="'+r2(n(k.qty)*n(k.rate))+'" title="Line total — qty × rate already worked out" onchange="setCode(\''+eid+'\',\''+k.id+'\',\'total\',this.value)">'
+    : fmt(codeClaimed(k));
   return '<tr class="k-'+sCls(s)+'"><td><b>'+esc(k.code)+'</b></td><td class="kd">'+esc(k.desc||'—')+(k.loc?'<div class="mute">'+esc(k.loc)+'</div>':'')+'</td>'+
-    '<td class="num">'+qty+'</td><td class="num">'+rate+'</td><td class="num">'+fmt(codeClaimed(k))+'</td>'+
+    '<td class="num">'+qty+'</td><td class="num mute">'+rate+'</td><td class="num">'+claimed+'</td>'+
     '<td>'+decisionSelect(eid,k,locked)+'</td><td class="num">'+apr+'</td><td class="num"><b>'+fmt(codeValue(k))+'</b></td>'+
     (locked ? '<td class="mute">'+esc(k.comment||'')+'</td>'
             : '<td><input class="cm-in cmt" value="'+esc(k.comment)+'" placeholder="Office comment" onchange="setCode(\''+eid+'\',\''+k.id+'\',\'comment\',this.value)"></td>')+
@@ -1444,7 +1463,7 @@ function codeRow(eid,k,full,locked){
   '</tr>';
 }
 function codeHead(full){
-  return '<thead><tr><th>Code</th><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Claimed</th>'+
+  return '<thead><tr><th>Code</th><th>Description</th><th class="num">Qty</th><th class="num">Unit rate</th><th class="num">Total claimed</th>'+
          '<th>Office decision</th><th class="num">Appr. qty</th><th class="num">Now</th><th>Comment</th>'+(full?'<th class="editable"></th>':'')+'</tr></thead>';
 }
 function cmEntry(){
@@ -1477,12 +1496,12 @@ function cmEntry(){
        '<datalist id="cm-hist">'+Object.keys(hist).sort().map(function(k){ return '<option value="'+esc(k)+'">'+esc(hist[k].desc||'')+'</option>'; }).join('')+'</datalist>'+
        '<div class="addrow"><input id="cm-code" list="cm-hist" inputmode="numeric" maxlength="6" placeholder="SOR code" onchange="cmLookup()">'+
        '<input id="cm-desc" placeholder="Description">'+
-       '<input id="cm-qty" type="number" step="0.01" placeholder="Qty">'+
-       '<input id="cm-rate" type="number" step="0.01" placeholder="Rate £">'+
+       '<input id="cm-qty" type="number" step="0.01" placeholder="Qty" onchange="cmQty()">'+
+       '<input id="cm-rate" type="number" step="0.01" placeholder="Total £ (qty × rate)" title="The line total — the price already multiplied by the quantity" oninput="this.dataset.auto=\'\'">'+
        '<button class="btn b-primary" onclick="addCodeRow()">Add</button></div>'+
        '<div class="hintline" style="margin-top:6px">Codes you have used before for '+esc(c?c.name:'this contractor')+' fill in their description and rate.</div>'+
        '<details class="paste"><summary>Paste codes from Excel</summary>'+
-       '<div class="hintline" style="margin-top:8px">Copy the rows for this property (Code, Description, Qty, Rate) and paste them here. Rows without a 6-digit code are skipped.</div>'+
+       '<div class="hintline" style="margin-top:8px">Copy the rows for this property (Code, Description, Qty, Total) and paste them here. The price is read as the line total — it is not multiplied by the quantity again. Rows without a 6-digit code are skipped.</div>'+
        '<textarea id="cm-paste" rows="5" placeholder="896001	TEST:UNOCCUPIED PROPERTY CERTIFICATE	1	128.15"></textarea>'+
        '<button class="btn b-primary" style="margin-top:8px" onclick="pasteCodes()">Add pasted codes</button></details></div>';
   return h;

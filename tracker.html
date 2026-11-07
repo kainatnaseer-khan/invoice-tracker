@@ -165,7 +165,7 @@ var auth = null, rtdb = null;
 if(FB_OK){ firebase.initializeApp(firebaseConfig); auth = firebase.auth(); rtdb = firebase.database(); }
 
 var ROOT = 'tracker';
-var DB = {contractors:[], jobs:[], engineers:[], minvoices:[], months:{}};
+var DB = {contractors:[], jobs:[], engineers:[], minvoices:[], months:{}, entries:[], icons:[]};
 var route = {view:'dash'};
 var modalOpen = false, pendingRender = false, seedTried = false, loaded = false;
 
@@ -196,11 +196,14 @@ function watchData(){
     if(modalOpen) pendingRender = true; else render();
     seedIfEmpty(v);
   }, function(){ document.getElementById('synced').textContent = 'No access — check your rules'; });
-  // read-only: the invoice app's monthly invoices, to show which invoice a property is on
+  // the invoice app's monthly invoices, to show which invoice a property is on
   ref('minvoices').on('value', function(snap){
     DB.minvoices = mapToList(snap.val()); index();
     if(!modalOpen && loaded) render();
   }, function(){});
+  // the invoice app's properties and contractors — completed jobs are sent across automatically
+  ref('entries').on('value', function(snap){ DB.entries = mapToList(snap.val()); }, function(){});
+  ref('contractors').on('value', function(snap){ DB.icons = mapToList(snap.val()); }, function(){});
 }
 function seedIfEmpty(v){
   if(seedTried || (v && v.contractors)) return;
@@ -548,6 +551,94 @@ function markDone(){
   if(!document.getElementById('j-comp').value) document.getElementById('j-comp').value = today();
   liveFlags(); toast('Marked completed — press Save to keep it');
 }
+
+/* ───────── Link to the invoice app ─────────
+   When a job is saved as Completed it is added to the invoice tracker as a property
+   (address, completion date, total, UPRN, job type) under the matching contractor, and the two stay linked:
+   later changes to the job (address, date, total…) update the property and any unpaid invoice it is on.
+   If the property already has SOR codes in the invoice app, its value comes from the codes and is left alone.
+   A property on a PAID invoice is never changed. */
+function nameKey(s){ return String(s||'').toLowerCase().replace(/&|\band\b/g,' ').replace(/[^a-z0-9]/g,''); }
+function invConFor(jobCon, map){
+  var nm = conName(jobCon); if(!nm || nm==='—') return null;
+  var k = nameKey(nm), hit = null;
+  DB.icons.forEach(function(c){ if(!hit && nameKey(c.name)===k) hit = c; });
+  DB.icons.forEach(function(c){ if(!hit){ var ck = nameKey(c.name); if(ck.indexOf(k)===0 || k.indexOf(ck)===0) hit = c; } });
+  DB.icons.forEach(function(c){ if(!hit){ var first = nameKey(String(c.name).split('/')[0]); if(first && (first===k || k.indexOf(first)===0)) hit = c; } });
+  if(hit) return hit.id;
+  // no such contractor in the invoice app yet — add it
+  var id = uid('c'), pretty = nm.toLowerCase().replace(/\b\w/g, function(m){ return m.toUpperCase(); });
+  map['contractors/'+id] = {name: pretty};
+  DB.icons.push({id:id, name:pretty});
+  return id;
+}
+function findEntryById(id){ var r=null; DB.entries.forEach(function(e){ if(e.id===id) r=e; }); return r; }
+function entryHasCodes(e){ return !!(e && e.codes && Object.keys(e.codes).length); }
+function invLinesOf(v){ var L = v.lines || []; return Array.isArray(L) ? L.map(function(l,i){ return {l:l,i:i}; }).filter(function(x){ return x.l; }) : Object.keys(L).map(function(k){ return {l:L[k],i:k}; }); }
+function entryOnInvoice(id, paidOnly){ return DB.minvoices.some(function(v){ return (!paidOnly || v.status==='Paid') && invLinesOf(v).some(function(x){ return x.l.entryId===id; }); }); }
+function r2(x){ return Math.round(n(x)*100)/100; }
+/* re-total every unpaid monthly invoice that holds this property */
+function invTotalsMap(entryId, amount, address, date, map){
+  DB.minvoices.forEach(function(v){
+    if(v.status==='Paid') return;
+    var hit=false, tot=0;
+    invLinesOf(v).forEach(function(x){
+      var a = n(x.l.amount);
+      if(x.l.entryId===entryId){
+        if(Math.abs(a-amount)>0.004){
+          if(x.l.origAmount==null) map['minvoices/'+v.id+'/lines/'+x.i+'/origAmount'] = a;
+          map['minvoices/'+v.id+'/lines/'+x.i+'/amount'] = amount; hit = true;
+        }
+        if(address && x.l.address!==address) map['minvoices/'+v.id+'/lines/'+x.i+'/address'] = address;
+        if(date && x.l.date!==date) map['minvoices/'+v.id+'/lines/'+x.i+'/date'] = date;
+        a = amount;
+      }
+      tot += a;
+    });
+    if(!hit) return;
+    if(v.origAmount==null) map['minvoices/'+v.id+'/origAmount'] = n(v.amount);
+    map['minvoices/'+v.id+'/amount'] = r2(tot);
+  });
+}
+/* add to `map` what the invoice app needs for this job; returns a short note for the toast */
+function linkMap(id, j, old, map){
+  var e = j.entryId ? findEntryById(j.entryId) : null;
+  if(j.entryId && !e) j.entryId = null;               // the property was deleted in the invoice app
+  var done = j.status==='Completed';
+  if(!done){
+    // un-completed by mistake: take it back out, unless it is already on an invoice or has codes
+    if(e && !entryOnInvoice(e.id) && !entryHasCodes(e)){ map['entries/'+e.id] = null; j.entryId = null; return 'removed from invoice app'; }
+    return '';
+  }
+  var cid = invConFor(j.con, map); if(!cid) return '';
+  var date = j.comp || today(), amt = n(j.amt);
+  var rec = {address:j.addr, date:date, ref:j.uprn||'', desc:j.type||'', contractorId:cid, jobId:id};
+  if(!e){
+    // a property already logged by hand for this address around this date — link it instead of adding a copy
+    var k = addrKey(j.addr);
+    DB.entries.forEach(function(x){
+      if(e || x.jobId || x.contractorId!==cid || addrKey(x.address)!==k) return;
+      if(x.date && Math.abs(daysBetween(x.date, date))>60) return;
+      if(DB.jobs.some(function(o){ return o.id!==id && o.entryId===x.id; })) return;
+      e = x;
+    });
+  }
+  if(!e){
+    var eid = uid('e'); rec.amount = amt;
+    map['entries/'+eid] = rec; j.entryId = eid;
+    return 'added to invoice app';
+  }
+  j.entryId = e.id;
+  if(entryOnInvoice(e.id, true)) return '';            // paid — a closed record
+  var changed = false;
+  if(e.ref) delete rec.ref;            // keep notes typed in the invoice app
+  if(e.desc) delete rec.desc;
+  Object.keys(rec).forEach(function(f){ if(String(e[f]==null?'':e[f])!==String(rec[f])){ map['entries/'+e.id+'/'+f] = rec[f]; changed = true; } });
+  if(!entryHasCodes(e) && Math.abs(n(e.amount)-amt)>0.004){ map['entries/'+e.id+'/amount'] = amt; changed = true; }
+  var newAmt = entryHasCodes(e) ? n(e.amount) : amt;
+  invTotalsMap(e.id, newAmt, j.addr, date, map);
+  return changed ? 'invoice app updated' : '';
+}
 function saveJob(){
   var j = readForm();
   if(!j.addr){ toast('Enter the property address'); return; }
@@ -556,18 +647,26 @@ function saveJob(){
   j.updated = Date.now();
   var id = EDIT, isNew = !id;
   if(isNew){ id = uid('j'); j.created = Date.now(); }
-  else { var old=null; DB.jobs.forEach(function(x){ if(x.id===id) old=x; }); if(old && old.created) j.created = old.created; }
-  var map = {}; map[ROOT+'/jobs/'+id] = j;
+  var old=null;
+  if(!isNew){ DB.jobs.forEach(function(x){ if(x.id===id) old=x; }); if(old && old.created) j.created = old.created; }
+  if(old && old.entryId) j.entryId = old.entryId;
+  var map = {}, note = '';
+  try { note = linkMap(id, j, old, map); } catch(err){ note = 'not sent to invoice app'; }
+  if(!j.entryId) j.entryId = null;
+  map[ROOT+'/jobs/'+id] = j;
   closeModal();
-  applyUpdate(map, isNew ? 'Job added' : 'Job saved');
+  applyUpdate(map, (isNew ? 'Job added' : 'Job saved') + (note ? ' · '+note : ''));
 }
 function delJob(){
   var id = EDIT, j=null; DB.jobs.forEach(function(x){ if(x.id===id) j=x; }); if(!j) return;
   var backup = JSON.parse(JSON.stringify(j)); delete backup.id;
   closeModal();
   var m = {}; m[ROOT+'/jobs/'+id] = null;
+  // its property in the invoice app goes too, unless it is on an invoice or has codes
+  var e = j.entryId ? findEntryById(j.entryId) : null, eBackup = null;
+  if(e && !entryOnInvoice(e.id) && !entryHasCodes(e)){ eBackup = JSON.parse(JSON.stringify(e)); delete eBackup.id; m['entries/'+e.id] = null; }
   applyUpdate(m);
-  toastUndo('Job deleted', function(){ var r={}; r[ROOT+'/jobs/'+id]=backup; applyUpdate(r,'Job restored'); });
+  toastUndo('Job deleted', function(){ var r={}; r[ROOT+'/jobs/'+id]=backup; if(eBackup) r['entries/'+e.id]=eBackup; applyUpdate(r,'Job restored'); });
 }
 
 /* ───────── Months: one invoice per contractor per month ─────────
