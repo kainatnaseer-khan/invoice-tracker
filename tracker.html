@@ -257,7 +257,10 @@ function paperMissing(j){
   if(j.certreq==='Yes' && j.cert!=='Yes') m.push('Cert');
   return m;
 }
+/* Work done but nothing to bill: invoice number typed as XXXXX (any number of x's). */
+function noCharge(j){ return /^x+$/i.test(String(j.inv||'').trim()); }
 function invState(j){
+  if(noCharge(j)) return 'NoCharge';
   if(j.status!=='Completed') return '';
   if(j.inv || j.invsent==='Yes') return 'Invoiced';
   return paperMissing(j).length ? 'Waiting' : 'READY';
@@ -277,7 +280,7 @@ function timesLogged(j){ var a = IDX.byKey[addrKey(j.addr)]; return a ? a.length
 
 function tcdPill(c){ return !c ? '' : '<span class="pill '+({'OVERDUE':'p-solidred','Due soon':'p-amber','Late':'p-red','On time':'p-green','On track':'p-blue','Done (no date)':'p-grey'}[c]||'p-grey')+'">'+c+'</span>'; }
 function statusPill(s){ return s ? '<span class="pill '+({'Completed':'p-green','Scheduled':'p-blue','In Progress':'p-amber','Pending':'p-red','Rescheduled':'p-purple','Cancelled':'p-grey'}[s]||'p-grey')+'">'+esc(s)+'</span>' : '<span class="pill p-grey">No status</span>'; }
-function invPill(s){ return !s ? '' : '<span class="pill '+({'READY':'p-solidgreen','Waiting':'p-amber','Invoiced':'p-blue'}[s])+'">'+(s==='READY'?'Ready to invoice':s)+'</span>'; }
+function invPill(s){ return !s ? '' : '<span class="pill '+({'READY':'p-solidgreen','Waiting':'p-amber','Invoiced':'p-blue','NoCharge':'p-grey'}[s])+'">'+(s==='NoCharge'?'No charge':s==='READY'?'Ready to invoice':s)+'</span>'; }
 function payPill(p){ return !p ? '' : '<span class="pill '+({'Paid':'p-green','Unpaid':'p-red','Overdue':'p-solidred','Awaiting PO':'p-amber'}[p]||'p-grey')+'">'+esc(p)+'</span>'; }
 function tick(v,lab){ var c = v==='Yes'?'t-yes':(v==='No'?'t-no':'t-na'); return '<span class="'+c+'" title="'+lab+': '+esc(v||'—')+'">'+lab[0]+'</span>'; }
 
@@ -453,7 +456,7 @@ function jobsTable(list, lim){
       '<td class="nowrap">'+uk(j.tcd)+'<div>'+tcdPill(t)+'</div></td><td class="nowrap">'+uk(j.sch)+'</td><td class="nowrap">'+uk(j.comp)+'</td>'+
       '<td>'+statusPill(j.status)+'</td>'+
       '<td class="ticks nowrap">'+tick(j.photos,'Photos')+tick(j.codes,'Codes')+tick(j.certreq==='Yes'?j.cert:(j.certreq==='No'?'N/A':j.cert),'Cert')+'</td>'+
-      '<td class="nowrap">'+esc(j.inv||'')+(j.invsent==='Yes'&&!j.inv?'<span class="mute">sent</span>':'')+'</td>'+
+      '<td class="nowrap">'+(noCharge(j)?'<span class="pill p-grey">No charge</span>':esc(j.inv||'')+(j.invsent==='Yes'&&!j.inv?'<span class="mute">sent</span>':''))+'</td>'+
       '<td class="num">'+(j.amt!=null&&j.amt!==''?fmt(j.amt):'')+'</td><td>'+payPill(j.pay)+'</td>'+
       '<td>'+(iv==='Waiting'?'<span class="pill p-amber">Need: '+pm.join(', ')+'</span>':invPill(iv))+'</td></tr>';
   });
@@ -696,7 +699,7 @@ function monthInvNo(cid,mk){ var r = monthRec(cid,mk); return r && r.inv ? Strin
 function isInvoiced(j){ return !!(j.inv || j.invsent==='Yes'); }
 function billMonth(j){
   var base = mkOf(j.rec); if(!base) return null;
-  if(j.inv){ var fixed = IDX.invMonth[invKey(j.con, j.inv)]; if(fixed) return fixed; }
+  if(j.inv && !noCharge(j)){ var fixed = IDX.invMonth[invKey(j.con, j.inv)]; if(fixed) return fixed; }
   if(j.status==='Cancelled') return base;
   var when = j.status==='Completed' ? (mkOf(j.comp) ? j.comp : j.rec) : today();
   var c = invMonthFor(when);
@@ -707,17 +710,18 @@ function missedInvoice(j){
   var bm = billMonth(j); return !!bm && today() > cutoffOf(bm);
 }
 function monthData(cid, mk){
-  var d = {A:[], B:[], C:[], X:[], R:0, inv:monthInvNo(cid,mk), cutoff:cutoffOf(mk)};
+  var d = {A:[], B:[], C:[], X:[], N:[], R:0, inv:monthInvNo(cid,mk), cutoff:cutoffOf(mk)};
   DB.jobs.forEach(function(j){
     if(j.con!==cid) return;
     var rm = mkOf(j.rec), bm = billMonth(j);
     if(rm===mk) d.R++;
     if(j.status==='Cancelled'){ if(rm===mk) d.X.push(j); return; }
+    if(noCharge(j)){ if(rm===mk) d.N.push(j); return; }
     if(bm===mk){ if(isInvoiced(j) || j.status==='Completed') d.A.push(j); else d.B.push(j); }
     else if(rm===mk) d.C.push(j);
   });
   var byRec = function(a,b){ var x=a.rec||'', y=b.rec||''; return x<y?-1:x>y?1:(a.created||0)-(b.created||0); };
-  d.A.sort(byRec); d.B.sort(byRec); d.C.sort(byRec); d.X.sort(byRec);
+  d.A.sort(byRec); d.B.sort(byRec); d.C.sort(byRec); d.X.sort(byRec); d.N.sort(byRec);
   d.groups = {}; d.order = [];
   d.A.forEach(function(j){ var k = j.inv ? String(j.inv).trim() : (j.invsent==='Yes' ? '(sent — no number)' : '');
     if(!(k in d.groups)){ d.groups[k] = []; d.order.push(k); } d.groups[k].push(j); });
@@ -755,6 +759,7 @@ function monthHint(j){
   var bm = billMonth(j); if(!bm || !j.con) return '';
   var c = conName(j.con), inv = monthInvNo(j.con, bm);
   if(j.status==='Cancelled') return '';
+  if(noCharge(j)) return '<div class="box info"><b>No charge</b> — work done, nothing to invoice (invoice no. '+esc(j.inv)+'). It is kept off the '+esc(c)+' invoices.</div>';
   if(isInvoiced(j)) return '<div class="box ok">On the <b>'+esc(c)+' '+monthLong(bm)+'</b> invoice'+(j.inv?' — <b>'+esc(j.inv)+'</b>':'')+'.</div>';
   if(j.status==='Completed'){
     var late = today() > cutoffOf(bm);
@@ -795,6 +800,7 @@ function tileOne(cid, mk){
     '<div class="tl"><span>Received this month</span><b>'+d.R+'</b></div>'+
     '<div class="tl"><span>On this invoice</span><b>'+d.A.length+' · '+fmtShort(d.total)+'</b></div>'+
     (d.B.length?'<div class="tl"><span>Still to finish</span><b>'+d.B.length+'</b></div>':'')+
+    (d.N.length?'<div class="tl"><span>No charge (XXXXX)</span><b>'+d.N.length+'</b></div>':'')+
     (d.C.length?'<div class="tl"><span>Moved to a later invoice</span><b>'+d.C.length+'</b></div>':'')+
     '<div class="tinv">'+(d.inv?'Invoice <b>'+esc(d.inv)+'</b>':'<span class="mute">No invoice number yet</span>')+' <span class="mute">· due '+uk(d.cutoff)+'</span></div>'+
     statePill(d)+'</div>';
@@ -849,6 +855,7 @@ function viewMonth(){
   h += monthSection('On '+monthOnly(mk)+'’s invoice', d.A, mk, 'A', 'Nothing completed for this month yet.');
   if(d.B.length) h += monthSection('Still to finish', d.B, mk, 'B', '', d.passed ? '' : 'Finish by '+uk(d.cutoff)+' to go on this invoice. After that they move to the '+monthOnly(shiftMk(mk,1))+' invoice.');
   if(d.C.length) h += monthSection('Received in '+monthOnly(mk)+' — on a later invoice', d.C, mk, 'C', '', 'Not completed by '+uk(d.cutoff)+', so they moved to a later invoice. They still count as received in '+monthOnly(mk)+'.');
+  if(d.N.length) h += monthSection('No charge — work done, nothing to invoice', d.N, mk, 'N', '', 'Invoice number typed as XXXXX. These are not counted on the invoice.');
   if(d.X.length) h += monthSection('Cancelled', d.X, mk, 'X', '');
   return h;
 }
@@ -875,7 +882,7 @@ function monthSection(title, list, mk, kind, emptyMsg, hint){
       '<td><b>'+esc(j.addr)+'</b>'+(j.type?'<div class="mute">'+esc(j.type)+'</div>':'')+(note?'<div style="margin-top:3px">'+note+'</div>':'')+'</td>'+
       '<td class="nowrap">'+esc(j.eng||'')+'</td><td class="nowrap">'+uk(j.comp)+'</td><td>'+statusPill(j.status)+'</td>'+
       '<td class="ticks nowrap">'+tick(j.photos,'Photos')+tick(j.codes,'Codes')+tick(j.certreq==='Yes'?j.cert:(j.certreq==='No'?'N/A':j.cert),'Cert')+'</td>'+
-      '<td class="nowrap">'+(j.inv?'<b>'+esc(j.inv)+'</b>':(j.invsent==='Yes'?'<span class="mute">sent</span>':(miss?'<b style="color:var(--red)">none</b>':'')))+'</td>'+
+      '<td class="nowrap">'+(noCharge(j)?'<span class="pill p-grey">No charge</span>':j.inv?'<b>'+esc(j.inv)+'</b>':(j.invsent==='Yes'?'<span class="mute">sent</span>':(miss?'<b style="color:var(--red)">none</b>':'')))+'</td>'+
       '<td class="num">'+(j.amt!=null&&j.amt!==''?fmt(j.amt):'')+'</td></tr>';
   });
   return h + '</tbody></table></div>';
@@ -943,6 +950,7 @@ function exportMonth(cid, mk){
         if(!isInvoiced(j)) bits.push('NOT ON AN INVOICE'); return bits.join(' · '); });
       block('STILL TO FINISH — goes on this invoice if completed by '+uk(d.cutoff), d.B, function(){ return ''; });
       block('RECEIVED IN '+monthOnly(mk).toUpperCase()+' — ON A LATER INVOICE', d.C, function(j){ return 'On '+monthLong(billMonth(j))+' invoice'; });
+      block('NO CHARGE — WORK DONE, NOTHING TO INVOICE', d.N, function(){ return 'No charge'; });
       block('CANCELLED', d.X, function(){ return ''; });
       aoa.push(['TALLY']); aoa.push(['','Invoice No','Properties','','','','','','','Total (£)']);
       d.order.forEach(function(k){ var L = d.groups[k]; aoa.push(['', k || 'NOT ON AN INVOICE', L.length,'','','','','','', Math.round(sum(L,function(j){return j.amt;})*100)/100]); });
@@ -951,6 +959,7 @@ function exportMonth(cid, mk){
       aoa.push(['', 'Still to finish', d.B.length]);
       aoa.push(['', 'Moved to a later invoice', d.C.length]);
       if(d.X.length) aoa.push(['', 'Cancelled', d.X.length]);
+      if(d.N.length) aoa.push(['', 'No charge (XXXXX)', d.N.length]);
       var ws = XLSX.utils.aoa_to_sheet(aoa, {cellDates:true, dateNF:'dd/mm/yyyy'});
       ws['!cols'] = [{wch:5},{wch:12},{wch:46},{wch:14},{wch:12},{wch:16},{wch:12},{wch:12},{wch:13},{wch:11},{wch:38}];
       XLSX.utils.book_append_sheet(wb, ws, c.name.slice(0,31).replace(/[\\\/\?\*\[\]:]/g,' '));
