@@ -131,6 +131,13 @@ tfoot td{background:#f8fafc;font-weight:800;border-top:2px solid var(--navy)}
 #toast.on{transform:translateX(-50%) translateY(0)}
 
 body.ro .editable{display:none!important}
+.fbox{width:100%;font-size:16px;padding:12px 14px;border:1.5px solid #dde3ec;border-radius:10px;margin-bottom:12px}
+.fgrp{background:#fff;border:1px solid #dde3ec;border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.fgrp .fa{font-size:15px;font-weight:800;color:var(--navy)}
+.fgrp .fl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #eef1f6;padding:7px 0 3px;font-size:12.5px}
+.fgrp .fl .amt{margin-left:auto;font-weight:800}
+.awarn{background:#fff7ed;border:1.5px solid #fed7aa;color:#7c2d12;border-radius:10px;padding:9px 11px;font-size:12.5px;margin:-4px 0 10px;line-height:1.5}
+.awarn.ok{background:#f0fdf4;border-color:#bbf7d0;color:#14532d}
 .rep{background:#fee2e2;color:var(--red);border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800;margin-left:6px;white-space:nowrap}
 .dupbox{background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px;margin-bottom:10px}
 .dupbox .dt{font-size:13px;font-weight:800;color:var(--amber);margin-bottom:4px}
@@ -241,6 +248,7 @@ body.ro .cm-in{pointer-events:none;opacity:.75}
   <div class="nav">
     <button class="nbtn on" id="nav-dash" onclick="go({view:'home'})">Contractors</button>
     <button class="nbtn" id="nav-inv" onclick="go({view:'invoices'})">All invoices</button>
+    <button class="nbtn" id="nav-find" onclick="go({view:'find'})">🔍 Find property</button>
   </div>
 </div>
 
@@ -456,7 +464,8 @@ function yearsAvailable(){
 function go(r){ route = r; window.scrollTo(0,0); render(); }
 
 function render(){
-  document.getElementById('nav-dash').className = 'nbtn' + (route.view!=='invoices'?' on':'');
+  document.getElementById('nav-dash').className = 'nbtn' + (route.view!=='invoices'&&route.view!=='find'?' on':'');
+  document.getElementById('nav-find').className = 'nbtn' + (route.view==='find'?' on':'');
   document.getElementById('nav-inv').className  = 'nbtn' + (route.view==='invoices'?' on':'');
   var el = document.getElementById('app');
   if(route.view==='home')            el.innerHTML = viewHome();
@@ -464,6 +473,7 @@ function render(){
   else if(route.view==='month')      el.innerHTML = viewMonth();
   else if(route.view==='week')       el.innerHTML = viewWeek();
   else if(route.view==='invoices')   el.innerHTML = viewInvoices();
+  else if(route.view==='find'){ el.innerHTML = viewFind(); var q=document.getElementById('fq'); if(q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } }
 }
 
 function crumbs(parts){
@@ -474,6 +484,77 @@ function crumbs(parts){
                      : '<span>'+esc(parts[i].t)+'</span>';
   }
   return h+'</div>';
+}
+
+/* ─────────────────────────── find a property ───────────────────────────
+   Matches on the address (ignoring spaces, commas, "Flat", "London"), the postcode or the job/UPRN ref,
+   across every contractor, every month, and every monthly invoice. */
+var STOPW = {flat:1,london:1,the:1,room:1,block:1,apartment:1,apt:1};
+function words(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(function(w){ return w && !STOPW[w]; }); }
+function squash(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function propKey(s){ return words(s).join(''); }
+function matchesQuery(text, ref, q){
+  var qs = squash(q); if(!qs) return false;
+  if(squash(text).indexOf(qs)>-1 || squash(ref).indexOf(qs)>-1) return true;
+  var qw = words(q); if(!qw.length) return false;
+  var tw = words(text).concat(words(ref));
+  return qw.every(function(w){ return tw.some(function(t){ return t===w || (w.length>2 && t.indexOf(w)===0); }); });
+}
+function findHits(q){
+  var groups = {}, order = [];
+  var add = function(addr){ var k = propKey(addr); if(!groups[k]){ groups[k] = {addr:addr, entries:[], lines:[]}; order.push(k); } return groups[k]; };
+  DB.entries.forEach(function(e){ if(matchesQuery(e.address, e.ref, q)) add(e.address).entries.push(e); });
+  DB.minvoices.forEach(function(v){ linesOf(v).forEach(function(x){ if(matchesQuery(x.l.address, x.l.ref, q)) add(x.l.address).lines.push({v:v, l:x.l}); }); });
+  DB.invoices.forEach(function(v){ /* weekly invoices have no property list */ });
+  order.sort(function(a,b){ var la = groups[a].entries.concat(groups[a].lines.map(function(x){return x.l;})).map(function(z){return z.date||'';}).sort().pop()||'';
+                             var lb = groups[b].entries.concat(groups[b].lines.map(function(x){return x.l;})).map(function(z){return z.date||'';}).sort().pop()||'';
+                             return la<lb?1:la>lb?-1:0; });
+  return order.map(function(k){ return groups[k]; });
+}
+function viewFind(){
+  var q = route.fq || '';
+  var h = '<h2 class="page">Find a property</h2><p class="page">Type part of the address, the postcode or the job / UPRN ref. Shows every time it was logged, for any contractor, and every monthly invoice it is on.</p>';
+  h += '<input id="fq" class="fbox" placeholder="e.g. 49 Queens Park, W10 4QA, HENC131" value="'+esc(q)+'" oninput="route.fq=this.value;document.getElementById(\'fres\').innerHTML=findResults(this.value)" autocomplete="off">';
+  return h + '<div id="fres">'+findResults(q)+'</div>';
+}
+function findResults(q){
+  if(squash(q).length<2) return '<div class="empty-state"><b>Start typing to search</b>'+DB.entries.length+' properties logged across '+DB.contractors.length+' contractors.</div>';
+  var G = findHits(q);
+  if(!G.length) return '<div class="empty-state"><b>Not entered yet</b>No property matches “'+esc(q)+'” — it has not been logged in the invoice tracker or put on any monthly invoice.</div>';
+  var h = '<div style="font-size:12px;color:var(--mute);margin-bottom:8px">'+G.length+' propert'+(G.length===1?'y':'ies')+' found'+(G.length>50?' — showing 50, type more to narrow it down':'')+'</div>';
+  G.slice(0,50).forEach(function(g){
+    var es = g.entries.slice().sort(function(a,b){ return (a.date||'')<(b.date||'')?-1:1; });
+    h += '<div class="fgrp"><div class="fa">'+esc(g.addr)+(es.length>1?'<span class="rep">LOGGED '+es.length+' TIMES</span>':'')+'</div>';
+    if(!es.length) h += '<div class="fl"><span class="pill p-part">Not logged as a property</span><span style="color:var(--mute)">only appears on an invoice below</span></div>';
+    es.forEach(function(e){
+      var c = contractor(e.contractorId), w = weekStartFor(e.date), mk = monthOfWeek(w);
+      var on = DB.minvoices.filter(function(v){ return linesOf(v).some(function(x){ return x.l.entryId===e.id; }); });
+      h += '<div class="fl"><b>'+esc(c?c.name:'—')+'</b><span>'+uk(e.date)+'</span>'+(e.ref?'<span style="color:var(--mute)">'+esc(e.ref)+'</span>':'')+
+           (on.length ? on.map(function(v){ return '<span class="pill p-paid">On invoice '+esc(v.number||'—')+'</span>'; }).join('') : '<span class="pill p-part">Not on a monthly invoice</span>')+
+           '<span class="amt">'+fmt(e.amount)+'</span>'+
+           (c?'<button class="tiny" onclick=\'go('+JSON.stringify({view:'week',cid:c.id,mk:mk,week:w})+')\'>Open week</button>':'')+
+           '<span class="editable"><button class="tiny" onclick="editEntry(\''+e.id+'\')">Edit</button></span></div>';
+    });
+    var linked = {}; es.forEach(function(e){ linked[e.id]=1; });
+    g.lines.filter(function(x){ return !x.l.entryId || !linked[x.l.entryId]; }).forEach(function(x){
+      var c = contractor(x.v.contractorId);
+      h += '<div class="fl"><span>🧾</span><b>Invoice '+esc(x.v.number||'—')+'</b><span>'+esc(c?c.name:'—')+' · '+(x.v.month?monthFull(x.v.month):'')+'</span>'+
+           '<span class="pill '+statusClass(x.v.status)+'">'+esc(x.v.status||'')+'</span><span class="amt">'+fmt(x.l.amount)+'</span>'+
+           '<button class="tiny" onclick="viewMonthly(\''+x.v.id+'\')">View invoice</button></div>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+/* while typing an address in Add/Edit property: say straight away if it is already logged */
+function addrCheck(v, selfId){
+  var el = document.getElementById('addr-check'); if(!el) return;
+  if(words(v).length<2 && squash(v).length<6){ el.innerHTML=''; return; }
+  var hits = DB.entries.filter(function(e){ return e.id!==selfId && matchesQuery(e.address, '', v); });
+  if(!hits.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="awarn"><b>Already logged '+hits.length+' time'+(hits.length===1?'':'s')+':</b><br>'+
+    hits.slice(0,5).map(function(e){ var c=contractor(e.contractorId); return esc(e.address)+' — '+esc(c?c.name:'')+', '+uk(e.date)+', '+fmt(e.amount); }).join('<br>')+
+    (hits.length>5?'<br>…and '+(hits.length-5)+' more':'')+'</div>';
 }
 
 /* ─────────────────────────── views ─────────────────────────── */
@@ -788,7 +869,7 @@ function contractorOptions(sel){
 function entryForm(e,cid,week){
   var d = e || {date: week ? week : today(), address:'', ref:'', desc:'', amount:''};
   var byCodes = e && hasCodes(e);
-  return '<div class="f"><label>Property address</label><input id="i-addr" value="'+esc(d.address)+'" placeholder="e.g. 12 High Street, London W4 1AA"></div>'+
+  return '<div class="f"><label>Property address</label><input id="i-addr" value="'+esc(d.address)+'" placeholder="e.g. 12 High Street, London W4 1AA" oninput="addrCheck(this.value,\''+(e?e.id:'')+'\')" autocomplete="off"></div><div id="addr-check"></div>'+
     '<div class="f2"><div class="f"><label>Date completed</label><input id="i-date" type="date" value="'+esc(d.date)+'"></div>'+
     '<div class="f"><label>Value (£)'+(byCodes?' — set by codes':'')+'</label><input id="i-amt" type="number" step="0.01" inputmode="decimal" value="'+esc(d.amount)+'" placeholder="0.00"'+(byCodes?' disabled':'')+'></div></div>'+
     (byCodes?'<div class="hintline">This value is the total of the property\'s codes. Change a code to change it.</div>':'')+
