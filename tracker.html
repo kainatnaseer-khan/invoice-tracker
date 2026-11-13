@@ -561,6 +561,7 @@ function markDone(){
    later changes to the job (address, date, total…) update the property and any unpaid invoice it is on.
    If the property already has SOR codes in the invoice app, its value comes from the codes and is left alone.
    A property on a PAID invoice is never changed. */
+function typeKey(s){ return String(s||'').toLowerCase().replace(/[^a-z]/g,''); }
 function nameKey(s){ return String(s||'').toLowerCase().replace(/&|\band\b/g,' ').replace(/[^a-z0-9]/g,''); }
 function invConFor(jobCon, map){
   var nm = conName(jobCon); if(!nm || nm==='—') return null;
@@ -615,13 +616,16 @@ function linkMap(id, j, old, map){
   }
   var cid = invConFor(j.con, map); if(!cid) return '';
   var date = j.comp || today(), amt = n(j.amt);
-  var rec = {address:j.addr, date:date, ref:j.uprn||'', desc:j.type||'', contractorId:cid, jobId:id};
+  var rec = {address:j.addr, date:date, ref:j.uprn||'', desc:j.type||'', wtype:j.type||'', contractorId:cid, jobId:id};
   if(!e){
     // a property already logged by hand for this address around this date — link it instead of adding a copy
     var k = addrKey(j.addr);
     DB.entries.forEach(function(x){
       if(e || x.jobId || x.contractorId!==cid || addrKey(x.address)!==k) return;
       if(x.date && Math.abs(daysBetween(x.date, date))>60) return;
+      if(entryOnInvoice(x.id)) return;                 // already billed — it is an earlier job at this address, not this one
+      var xt = typeKey(x.wtype || x.desc), jt = typeKey(j.type);
+      if(xt && jt && xt!==jt) return;                  // different kind of work (e.g. PIR vs Rewire) — a separate property
       if(DB.jobs.some(function(o){ return o.id!==id && o.entryId===x.id; })) return;
       e = x;
     });
@@ -636,6 +640,7 @@ function linkMap(id, j, old, map){
   var changed = false;
   if(e.ref) delete rec.ref;            // keep notes typed in the invoice app
   if(e.desc) delete rec.desc;
+  if(e.wtype || !rec.wtype) delete rec.wtype;
   Object.keys(rec).forEach(function(f){ if(String(e[f]==null?'':e[f])!==String(rec[f])){ map['entries/'+e.id+'/'+f] = rec[f]; changed = true; } });
   if(!entryHasCodes(e) && Math.abs(n(e.amount)-amt)>0.004){ map['entries/'+e.id+'/amount'] = amt; changed = true; }
   var newAmt = entryHasCodes(e) ? n(e.amount) : amt;
