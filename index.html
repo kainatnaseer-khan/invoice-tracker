@@ -243,6 +243,7 @@ body.ro .cm-in{pointer-events:none;opacity:.75}
     </div>
     <div class="spacer"></div>
     <div class="live"><span class="dot"></span><span id="synced">Connecting…</span></div>
+    <button class="mini editable" id="wtbtn" onclick="toggleWT()" title="Show the kind of work in brackets after each property address on invoices, PDFs, Excel and CSV downloads">Work type on downloads: on</button>
     <button class="mini" id="robtn" onclick="toggleRO()">View only: off</button>
   </div>
   <div class="nav">
@@ -283,7 +284,7 @@ if(FB_OK){
   rtdb = firebase.database();
 }
 
-var DB  = {contractors:[], entries:[], invoices:[], minvoices:[]};
+var DB  = {contractors:[], entries:[], invoices:[], minvoices:[], tjobs:[], settings:{}};
 var route = {view:'home'};
 var modalOpen = false, pendingRender = false, seedTried = false;
 
@@ -326,6 +327,9 @@ function watchData(){
     DB.entries     = mapToList(v.entries);
     DB.invoices    = mapToList(v.invoices);
     DB.minvoices   = mapToList(v.minvoices);
+    DB.tjobs       = mapToList(v.tracker && v.tracker.jobs);
+    DB.settings    = (v.meta && v.meta.settings) || {};
+    var wb = document.getElementById('wtbtn'); if(wb) wb.textContent = 'Work type on downloads: '+(wtOn()?'on':'off');
     stamp();
     if(modalOpen){ pendingRender = true; if(CM) renderCM(); } else { render(); }
     seedIfEmpty(v);
@@ -726,7 +730,8 @@ function viewWeek(){
     h += '<div class="tw"><table><thead><tr><th>Date</th><th>Property address</th><th>Job / UPRN ref</th><th>Work done</th><th class="num">Value</th><th></th></tr></thead><tbody>';
     es.forEach(function(e){
       var cl = codesClaimed(e), cut = hasCodes(e) && cl-n(e.amount)>0.004;
-      h += '<tr><td>'+uk(e.date)+'</td><td><b>'+esc(e.address)+'</b>'+(reps[e.id]?'<span class="rep">REPEATED</span>':'')+
+      var wt = workTypeOf(e);
+      h += '<tr><td>'+uk(e.date)+'</td><td><b>'+esc(e.address)+'</b>'+(wt?' <span class="pill p-none">'+esc(wt)+'</span>':'')+(reps[e.id]?'<span class="rep">REPEATED</span>':'')+
            '<div class="codecell" onclick="openCodes(\''+e.id+'\')">'+codeChip(e)+'</div></td><td>'+esc(e.ref||'—')+'</td><td>'+esc(e.desc||'—')+'</td>'+
            '<td class="num">'+fmt(e.amount)+(cut?'<div class="chg">'+fmt(cl-n(e.amount))+' removed</div>':'')+'</td>'+
            '<td class="num"><button class="tiny" onclick="openCodes(\''+e.id+'\')">Codes</button><span class="editable"><button class="tiny" onclick="editEntry(\''+e.id+'\')">Edit</button>'+
@@ -866,6 +871,43 @@ function contractorOptions(sel){
   }).join('');
 }
 
+/* ───────── work type in brackets after the address on downloads ─────────
+   Setting lives at meta/settings/workTypeInAddr (shared by every device, on unless switched off).
+   Type comes from the property's own "Work type"; if that is blank, from the job tracker's
+   job type for the same address. */
+var WORKTYPES = ['Disposal','PIR','Minor Works','Rewire','EICR','New Void','Snags','Disrepair','Remedials','Other'];
+function wtOn(){ return !(DB.settings && DB.settings.workTypeInAddr===false); }
+function toggleWT(){
+  var on = !wtOn(); DB.settings.workTypeInAddr = on;
+  var b = document.getElementById('wtbtn'); if(b) b.textContent = 'Work type on downloads: '+(on?'on':'off');
+  save('meta/settings/workTypeInAddr', on, on ? 'Work type will show next to the address on downloads' : 'Work type switched off on downloads');
+}
+function wtKey(s){ return String(s||'').toLowerCase().replace(/\(.*?\)/g,' ').replace(/\blondon\b/g,' ').replace(/[^a-z0-9]/g,''); }
+function trackerType(addr, date){
+  var k = wtKey(addr); if(!k) return '';
+  var best = null, bestGap = Infinity;
+  DB.tjobs.forEach(function(j){
+    var jk = wtKey(j.addr);
+    if(!j.type || !jk || !(jk===k || (Math.min(jk.length,k.length)>=6 && (jk.indexOf(k)===0 || k.indexOf(jk)===0)))) return;   // same address, with or without the postcode
+    var d = j.comp || j.rec || '';
+    var gap = (date && d) ? Math.abs(new Date(date) - new Date(d)) : 1e15 - (d ? new Date(d).getTime() : 0);
+    if(gap < bestGap){ bestGap = gap; best = j; }
+  });
+  return best ? String(best.type) : '';
+}
+function workTypeOf(e, l){
+  var t = (e && e.wtype) || (l && l.wtype) || '';
+  if(!t) t = trackerType((e && e.address) || (l && l.address), (e && e.date) || (l && l.date));
+  return String(t||'').trim();
+}
+function addrOut(addr, e, l){
+  var a = String(addr||'');
+  if(!wtOn()) return a;
+  var t = workTypeOf(e, l);
+  if(!t || a.toLowerCase().indexOf('('+t.toLowerCase()+')')>-1) return a;
+  return a + ' (' + t + ')';
+}
+
 function entryForm(e,cid,week){
   var d = e || {date: week ? week : today(), address:'', ref:'', desc:'', amount:''};
   var byCodes = e && hasCodes(e);
@@ -877,6 +919,8 @@ function entryForm(e,cid,week){
     '<div class="hintline">Logged under the wrong contractor or in the wrong week? Change either one here and the record moves with its value.</div>'+
     '<div class="f2"><div class="f"><label>Job / UPRN ref</label><input id="i-ref" value="'+esc(d.ref)+'" placeholder="Optional"></div>'+
     '<div class="f"><label>Work done</label><input id="i-desc" value="'+esc(d.desc)+'" placeholder="e.g. Void EICR + remedials"></div></div>'+
+    '<datalist id="dl-wtype">'+WORKTYPES.map(function(t){ return '<option value="'+t+'">'; }).join('')+'</datalist>'+
+    '<div class="f"><label>Work type — shows in brackets after the address on invoices &amp; Excel</label><input id="i-wtype" list="dl-wtype" value="'+esc(d.wtype||'')+'" placeholder="'+esc(e && !e.wtype && trackerType(e.address,e.date) ? trackerType(e.address,e.date)+' (from job tracker)' : 'e.g. Disposal, PIR, Minor Works, Rewire')+'" autocomplete="off"></div>'+
     '<button class="btn b-primary" style="width:100%" onclick="saveEntry(\''+(e?e.id:'')+'\')">Save property</button>';
 }
 function addEntry(cid,week){ openModal('Add property', entryForm(null,cid,week)); }
@@ -892,7 +936,7 @@ function saveEntry(id){
   if(!cid){toast('Choose a contractor');return;}
   var was = null; DB.entries.forEach(function(x){if(x.id===id)was=x;});
   var rec = {address:addr, date:date, amount:(was && hasCodes(was)) ? codesTotal(was) : n(amt),
-             ref:val('i-ref'), desc:val('i-desc'), contractorId:cid};
+             ref:val('i-ref'), desc:val('i-desc'), wtype:val('i-wtype').trim(), contractorId:cid};
   var moved = was && (weekStartFor(was.date)!==weekStartFor(date) || was.contractorId!==cid);
   var msg = moved ? ('Moved to '+contractor(cid).name+', week of '+ukShort(weekStartFor(date)))
                   : (id?'Property updated':'Property added');
@@ -977,7 +1021,7 @@ function openGen(cid,mk){
   GEN = {
     cid: cid, mk: mk, editing: null,
     lines: es.map(function(e){
-      return {id:e.id, address:e.address, date:e.date, ref:e.ref||'', desc:e.desc||'',
+      return {id:e.id, address:e.address, date:e.date, ref:e.ref||'', desc:e.desc||'', wtype:workTypeOf(e),
               amount:n(e.amount), include:true, group:(gi[e.id]===undefined?-1:gi[e.id])};
     }),
     groups: groups.map(function(g){ return {addr:g.items[0].address, amount:n(g.items[0].amount), count:g.items.length, answer:null}; })
@@ -1012,7 +1056,7 @@ function renderGen(){
     if(l.include) total += l.amount;
     h += '<div class="gl'+(l.include?'':' off')+'">'+
       '<input type="checkbox" '+(l.include?'checked':'')+' onchange="toggleGenLine('+i+')">'+
-      '<div class="ga"><b>'+esc(l.address)+'</b>'+(l.group>-1?'<span class="rep">REPEATED</span>':'')+
+      '<div class="ga"><b>'+esc(addrOut(l.address, null, l))+'</b>'+(l.group>-1?'<span class="rep">REPEATED</span>':'')+
       '<div style="font-size:11px;color:var(--mute);margin-top:2px">'+uk(l.date)+(l.ref?' · '+esc(l.ref):'')+' '+codeChip(findEntry(l.id))+'</div></div>'+
       '<div class="gv">'+fmt(l.amount)+'</div></div>';
   });
@@ -1050,7 +1094,7 @@ function saveMonthly(){
   var num = val('i-mnum');
   if(!num){ toast('Put your invoice number in first'); return; }
   var lines = GEN.lines.filter(function(l){return l.include;})
-    .map(function(l){ return {entryId:l.id, address:l.address, date:l.date, ref:l.ref, desc:l.desc, amount:l.amount}; });
+    .map(function(l){ return {entryId:l.id, address:l.address, date:l.date, ref:l.ref, desc:l.desc, wtype:l.wtype||'', amount:l.amount}; });
   if(!lines.length){ toast('Tick at least one property'); return; }
   var rec = {
     contractorId: GEN.cid, month: GEN.mk, number: num,
@@ -1098,7 +1142,7 @@ function invoiceDoc(v){
   h += '<div class="to"><b>Invoice to:</b><br>'+esc(c?c.name:'—')+'</div>';
   h += '<table><thead><tr><th>#</th><th>Property address</th><th>Completed</th><th>Ref</th><th class="tr">Value</th></tr></thead><tbody>';
   (v.lines||[]).forEach(function(l,i){
-    h += '<tr><td>'+(i+1)+'</td><td>'+esc(l.address)+'</td><td>'+uk(l.date)+'</td><td>'+esc(l.ref||'')+'</td><td class="tr">'+fmt(l.amount)+'</td></tr>';
+    h += '<tr><td>'+(i+1)+'</td><td>'+esc(addrOut(l.address, l.entryId ? findEntry(l.entryId) : null, l))+'</td><td>'+uk(l.date)+'</td><td>'+esc(l.ref||'')+'</td><td class="tr">'+fmt(l.amount)+'</td></tr>';
   });
   h += '<tr class="tot"><td colspan="4">TOTAL — '+(v.lines?v.lines.length:0)+' properties</td><td class="tr">'+fmt(v.amount)+'</td></tr>';
   h += '</tbody></table>';
@@ -1155,7 +1199,7 @@ function exportMonthlyCSV(id){
   var c = contractor(v.contractorId);
   var rows = [['Invoice','Contractor','Period','Property address','Completed','Ref','Value (£)']];
   (v.lines||[]).forEach(function(l){
-    rows.push([v.number, c?c.name:'', monthFull(v.month), l.address, uk(l.date), l.ref||'', n(l.amount).toFixed(2)]);
+    rows.push([v.number, c?c.name:'', monthFull(v.month), addrOut(l.address, l.entryId ? findEntry(l.entryId) : null, l), uk(l.date), l.ref||'', n(l.amount).toFixed(2)]);
   });
   rows.push(['','','','TOTAL','','', n(v.amount).toFixed(2)]);
   var csv = '\uFEFF'+rows.map(function(r){return r.map(csvCell).join(',');}).join('\n');
@@ -1187,7 +1231,8 @@ function exportInvoiceXLSX(v, id){
       var l = x.l, e = l.entryId ? findEntry(l.entryId) : null;
       var codes = codesOf(e).filter(function(k){ return k.status!=='Not invoiced'; });
       var tot = n(l.amount); grand += tot;
-      row([idx+1, l.address, uk(l.date)+(l.ref?' · Ref '+l.ref:''), '', '', '', '', '', '']);
+      var addrX = addrOut(l.address, e, l);
+      row([idx+1, addrX, uk(l.date)+(l.ref?' · Ref '+l.ref:''), '', '', '', '', '', '']);
       if(codes.length){
         codes.forEach(function(k){
           var q = (k.status==='Amended' && k.apprQty!=='' && k.apprQty!=null) ? n(k.apprQty) : n(k.qty);
@@ -1198,7 +1243,7 @@ function exportInvoiceXLSX(v, id){
       }
       row(['', 'Property total', '', '', '', '', tot, '', '']);
       row([]);
-      S.push([idx+1, l.address, uk(l.date), l.ref||'',
+      S.push([idx+1, addrX, uk(l.date), l.ref||'',
               codes.filter(function(k){ return codeValue(k)>0; }).map(function(k){
                 var q=(k.status==='Amended'&&k.apprQty!==''&&k.apprQty!=null)?n(k.apprQty):n(k.qty);
                 return k.code+(q!==1?' x'+q:'');
@@ -1238,7 +1283,7 @@ function exportCSV(cid,mk,week){
     var inum = vs.map(function(v){return v.number;}).join(' / ');
     var ist  = vs.map(function(v){return v.status;}).join(' / ');
     entriesFor(cid,w).forEach(function(e){
-      rows.push([c.name, monthFull(mk), weekLabel(w), uk(e.date), e.address, e.ref||'', e.desc||'', n(e.amount).toFixed(2), inum, ist]);
+      rows.push([c.name, monthFull(mk), weekLabel(w), uk(e.date), addrOut(e.address, e), e.ref||'', e.desc||'', n(e.amount).toFixed(2), inum, ist]);
     });
     rows.push(['','',weekLabel(w)+' TOTAL','','','','', worksValue(entriesFor(cid,w)).toFixed(2), inum, ist]);
   });
